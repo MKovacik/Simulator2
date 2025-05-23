@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telecom Tariff Simulator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f0f2f5;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            padding: 0 0 32px 0;
+            position: relative;
+        }
+        h1 {
+            color: #1976d2;
+            text-align: center;
+            margin: 0;
+            padding: 16px 0 8px 0;
+            font-size: 1.6rem;
+            letter-spacing: 0.5px;
+        }
+        .controls {
+            text-align: center;
+            margin: 0 32px 12px 32px;
+            padding: 12px;
+            background: #f7fafc;
+            border-radius: 12px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        }
+        .mode-selector {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .mode-option {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 6px;
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 140px;
+            justify-content: center;
+        }
+        .mode-option:hover {
+            border-color: #1976d2;
+            background: #f5f9ff;
+        }
+        .mode-option.active {
+            border-color: #1976d2;
+            background: #e3f2fd;
+            box-shadow: 0 2px 8px rgba(25,118,210,0.1);
+        }
+        .mode-option input[type="radio"] {
+            width: 14px;
+            height: 14px;
+            margin: 0;
+            accent-color: #1976d2;
+        }
+        .mode-option label {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #333;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .mode-icon {
+            font-size: 1.4rem;
+        }
+        .mode-description {
+            text-align: center;
+            color: #666;
+            margin-bottom: 12px;
+            font-size: 0.85rem;
+            line-height: 1.3;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+        }
+        .conversation {
+            margin: 0 32px 16px 32px;
+            padding: 24px;
+            min-height: 350px;
+            max-height: 500px;
+            overflow-y: auto;
+            background: #f7fafc;
+            border-radius: 12px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+            position: relative;
+        }
+        .loading-spinner {
+            position: absolute;
+            top: 16px;
+            right: 24px;
+            z-index: 100;
+            display: none;
+            align-items: center;
+            gap: 6px;
+        }
+        .loading-spinner.active {
+            display: flex;
+        }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #2196f3;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            animation: spin 1s linear infinite;
+        }
+        .loading-text {
+            font-size: 0.8rem;
+            color: #888;
+        }
+        .message {
+            display: flex;
+            align-items: flex-end;
+            margin-bottom: 12px;
+            gap: 8px;
+        }
+        .avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #e3e3e3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            font-weight: bold;
+            color: #fff;
+            flex-shrink: 0;
+        }
+        .customer .avatar {
+            background: #1976d2;
+        }
+        .bot .avatar {
+            background: #43a047;
+        }
+        .bubble {
+            padding: 10px 14px;
+            border-radius: 12px;
+            max-width: 520px;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+            position: relative;
+            word-break: break-word;
+        }
+        .customer .bubble {
+            background: #e3f2fd;
+            color: #1a237e;
+            border-bottom-left-radius: 4px;
+        }
+        .bot .bubble {
+            background: #e8f5e9;
+            color: #1b5e20;
+            border-bottom-right-radius: 4px;
+        }
+        .meta {
+            font-size: 0.7rem;
+            color: #888;
+            margin-top: 3px;
+            margin-left: 36px;
+        }
+        .message.customer {
+            flex-direction: row-reverse;
+        }
+        .message.customer .meta {
+            text-align: right;
+            margin-left: 0;
+            margin-right: 36px;
+        }
+        button {
+            background: #1976d2;
+            color: #fff;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-width: 120px;
+            justify-content: center;
+        }
+        button:hover:not(:disabled) {
+            background: #1565c0;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        button:disabled {
+            background: #b0bec5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .button-icon {
+            font-size: 1.3rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @media (max-width: 900px) {
+            .container { max-width: 100%; border-radius: 0; }
+            .conversation { padding: 12px 4px 0 4px; }
+            .bubble { max-width: 90vw; }
+            .loading-spinner { right: 10px; top: 10px; }
+            .status-bar { font-size: 0.95rem; }
+        }
+        .status-bar {
+            position: fixed;
+            left: 0;
+            bottom: 0;
+            width: 100vw;
+            background: #e3f2fd;
+            color: #1976d2;
+            font-size: 0.85rem;
+            text-align: center;
+            padding: 6px 0;
+            box-shadow: 0 -2px 8px rgba(33,150,243,0.05);
+            z-index: 200;
+            letter-spacing: 0.3px;
+        }
+        .status-bar.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .status-bar.complete {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+        .user-input-container {
+            display: none;
+            margin: 0 32px;
+            background: #f7fafc;
+            padding: 12px;
+            border-radius: 12px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        }
+        .user-input-wrapper {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .user-input-wrapper input {
+            flex: 1;
+            padding: 8px 12px;
+            font-size: 0.9rem;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+            transition: all 0.3s ease;
+            background: #fff;
+        }
+        .user-input-wrapper input:focus {
+            outline: none;
+            border-color: #1976d2;
+            box-shadow: 0 0 0 3px rgba(25,118,210,0.1);
+        }
+        .user-input-wrapper button {
+            padding: 8px 20px;
+            min-width: 80px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div class="container" aria-label="Telecom Tariff Simulator">
+        <div class="loading-spinner" id="loadingSpinner">
+            <div class="spinner"></div>
+            <span class="loading-text">Simulating...</span>
+        </div>
+        <h1>Telecom Tariff Simulator</h1>
+        <div class="controls">
+            <div class="mode-selector">
+                <div class="mode-option" onclick="setMode('simulator')">
+                    <input type="radio" id="simulatorMode" name="mode" checked>
+                    <label for="simulatorMode">
+                        Simulator Mode
+                    </label>
+                </div>
+                <div class="mode-option" onclick="setMode('user')">
+                    <input type="radio" id="userMode" name="mode">
+                    <label for="userMode">
+                        User Input Mode
+                    </label>
+                </div>
+            </div>
+            <div class="mode-description" id="modeDescription">
+                Simulator mode will automatically generate a conversation between a customer and the Telekom assistant.
+            </div>
+            <div class="action-buttons">
+                <button onclick="startSimulation()" id="simulateBtn">
+                    Start Simulation
+                </button>
+                <button onclick="downloadConversation()" id="downloadBtn" style="display:none;">
+                    Download Conversation
+                </button>
+            </div>
+        </div>
+        <div class="conversation" id="conversation" aria-live="polite"></div>
+        <div class="user-input-container" id="userInputArea">
+            <div class="user-input-wrapper">
+                <input type="text" id="userInput" placeholder="Type your message..." onkeydown="if(event.key==='Enter'){sendUserMessage();return false;}">
+                <button type="button" onclick="sendUserMessage()" id="sendBtn">
+                    Send
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="status-bar" id="statusBar">Ready.</div>
+
+    <script>
+        // Cache DOM elements
+        const elements = {
+            simulateBtn: document.getElementById('simulateBtn'),
+            loadingSpinner: document.getElementById('loadingSpinner'),
+            conversation: document.getElementById('conversation'),
+            downloadBtn: document.getElementById('downloadBtn'),
+            simulatorMode: document.getElementById('simulatorMode'),
+            userMode: document.getElementById('userMode'),
+            userModeOption: document.querySelector('.mode-option[onclick="setMode(\'user\')"]'),
+            userInputArea: document.getElementById('userInputArea'),
+            userInput: document.getElementById('userInput'),
+            sendBtn: document.getElementById('sendBtn'),
+            statusBar: document.getElementById('statusBar'),
+            modeDescription: document.getElementById('modeDescription')
+        };
+
+        // State management using sessionStorage
+        const state = {
+            get conversationHistory() {
+                return JSON.parse(sessionStorage.getItem('conversationHistory') || '[]');
+            },
+            set conversationHistory(value) {
+                sessionStorage.setItem('conversationHistory', JSON.stringify(value));
+            },
+            get customerName() {
+                return sessionStorage.getItem('customerName') || 'Customer';
+            },
+            set customerName(value) {
+                sessionStorage.setItem('customerName', value);
+            },
+            get simulatorMode() {
+                return sessionStorage.getItem('simulatorMode') === 'true';
+            },
+            set simulatorMode(value) {
+                sessionStorage.setItem('simulatorMode', value);
+            },
+            get simulationRunning() {
+                return sessionStorage.getItem('simulationRunning') === 'true';
+            },
+            set simulationRunning(value) {
+                sessionStorage.setItem('simulationRunning', value);
+            }
+        };
+
+        let eventSource = null;
+
+        // Debounce function to limit rapid function calls
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // Throttle function to limit function execution rate
+        function throttle(func, limit) {
+            let inThrottle;
+            return function executedFunction(...args) {
+                if (!inThrottle) {
+                    func(...args);
+                    inThrottle = true;
+                    setTimeout(() => inThrottle = false, limit);
+                }
+            };
+        }
+
+        function setStatusBar(message, type = '') {
+            elements.statusBar.textContent = message;
+            elements.statusBar.className = 'status-bar' + (type ? ' ' + type : '');
+        }
+
+        function setMode(mode) {
+            state.simulatorMode = mode === 'simulator';
+            
+            // Update radio buttons
+            elements.simulatorMode.checked = state.simulatorMode;
+            elements.userMode.checked = !state.simulatorMode;
+            
+            // Update mode options styling
+            document.querySelectorAll('.mode-option').forEach(option => {
+                option.classList.remove('active');
+            });
+            document.querySelector(`.mode-option[onclick="setMode('${mode}')"]`).classList.add('active');
+            
+            // Update UI elements
+            if (state.simulatorMode) {
+                elements.userInputArea.style.display = 'none';
+                elements.userInput.disabled = true;
+                elements.sendBtn.disabled = true;
+                elements.simulateBtn.style.display = 'flex';
+                elements.modeDescription.textContent = 'Simulator mode will automatically generate a conversation between a customer and the Telekom assistant.';
+            } else {
+                elements.userInputArea.style.display = 'block';
+                elements.userInput.disabled = false;
+                elements.sendBtn.disabled = false;
+                elements.simulateBtn.style.display = 'none';
+                elements.modeDescription.textContent = 'User input mode allows you to chat directly with the Telekom assistant.';
+            }
+        }
+
+        function resetSimulationState() {
+            elements.simulateBtn.disabled = true;
+            elements.simulatorMode.disabled = true;
+            elements.userMode.disabled = true;
+            elements.userModeOption.style.opacity = '0.5';
+            elements.userModeOption.style.cursor = 'not-allowed';
+            elements.userModeOption.onclick = null;
+            state.simulationRunning = true;
+            elements.loadingSpinner.classList.add('active');
+            elements.conversation.innerHTML = '';
+            state.conversationHistory = [];
+            elements.downloadBtn.style.display = 'none';
+            state.customerName = 'Customer';
+        }
+
+        function restoreSimulationState() {
+            elements.simulateBtn.disabled = false;
+            elements.simulatorMode.disabled = false;
+            elements.userMode.disabled = false;
+            elements.userModeOption.style.opacity = '1';
+            elements.userModeOption.style.cursor = 'pointer';
+            elements.userModeOption.onclick = function() { setMode('user'); };
+            state.simulationRunning = false;
+            elements.loadingSpinner.classList.remove('active');
+        }
+
+        function startSimulation() {
+            if (!state.simulatorMode) return;
+            
+            resetSimulationState();
+            setStatusBar('Starting simulation...', '');
+            
+            // Close existing connection if any
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            // Create new SSE connection with unique session ID
+            const sessionId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+            eventSource = new EventSource(`/simulate?simulator_mode=1&session_id=${sessionId}`);
+            
+            eventSource.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.persona_name) {
+                        state.customerName = data.persona_name;
+                        setStatusBar('Simulating conversation for ' + state.customerName + '...', '');
+                        return;
+                    }
+                    if (data.status) {
+                        setStatusBar(data.status, '');
+                        return;
+                    }
+                    if (data.error) {
+                        handleSimulationError(data.error);
+                        return;
+                    }
+                    if (data.end) {
+                        handleSimulationEnd();
+                        return;
+                    }
+                    addMessage(data.role, data.content);
+                    const history = state.conversationHistory;
+                    history.push({role: data.role, content: data.content, timestamp: new Date().toLocaleTimeString()});
+                    state.conversationHistory = history;
+                } catch (error) {
+                    console.error('Error processing message:', error);
+                    setStatusBar('Error processing message: ' + error.message, 'error');
+                }
+            };
+            
+            eventSource.onerror = function(error) {
+                console.error('SSE connection error:', error);
+                handleSimulationError('Connection error. Please try again.');
+            };
+            
+            eventSource.onopen = function() {
+                console.log('SSE connection opened');
+                setStatusBar('Simulation started...', '');
+            };
+        }
+
+        function handleSimulationError(error) {
+            if (eventSource) {
+                eventSource.close();
+            }
+            elements.conversation.innerHTML = `<div class="message bot"><div class="bubble">Error: ${error}</div></div>`;
+            restoreSimulationState();
+            setStatusBar('Error: ' + error, 'error');
+        }
+
+        function handleSimulationEnd() {
+            if (eventSource) {
+                eventSource.close();
+            }
+            restoreSimulationState();
+            setStatusBar('Simulation complete.', 'complete');
+            elements.downloadBtn.style.display = 'inline-block';
+        }
+
+        // Throttled scroll to bottom
+        const scrollToBottom = throttle(() => {
+            elements.conversation.scrollTo({ top: elements.conversation.scrollHeight, behavior: 'smooth' });
+        }, 100);
+
+        function addMessage(role, content) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ' + (role === 'bot' ? 'bot' : 'customer');
+            
+            const avatarDiv = document.createElement('div');
+            avatarDiv.className = 'avatar';
+            avatarDiv.setAttribute('aria-hidden', 'true');
+            avatarDiv.innerText = role === 'bot' ? '🤖' : '🧑';
+            
+            let sanitized = content.trim()
+                .replace(/^```[\s\S]*?```$/gm, '')
+                .replace(/^```|```$/g, '')
+                .trim();
+            
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.className = 'bubble';
+            bubbleDiv.innerHTML = marked.parse(sanitized);
+            
+            const metaDiv = document.createElement('div');
+            metaDiv.className = 'meta';
+            metaDiv.innerText = new Date().toLocaleTimeString();
+            
+            messageDiv.appendChild(avatarDiv);
+            messageDiv.appendChild(bubbleDiv);
+            messageDiv.appendChild(metaDiv);
+            
+            if (role !== 'bot') {
+                bubbleDiv.innerHTML = `<strong>${state.customerName}</strong><br>` + bubbleDiv.innerHTML;
+            } else {
+                bubbleDiv.innerHTML = `<strong>Telekom Assistant</strong><br>` + bubbleDiv.innerHTML;
+            }
+            
+            elements.conversation.appendChild(messageDiv);
+            scrollToBottom();
+        }
+
+        // Debounced message sending
+        const debouncedSendMessage = debounce(() => {
+            const message = elements.userInput.value.trim();
+            if (!message) return;
+            
+            elements.userInput.disabled = true;
+            elements.sendBtn.disabled = true;
+            
+            addMessage('customer', message);
+            const history = state.conversationHistory;
+            history.push({role: 'customer', content: message, timestamp: new Date().toLocaleTimeString()});
+            state.conversationHistory = history;
+            elements.userInput.value = '';
+            setStatusBar('Waiting for Telekom Assistant response...', '');
+            
+            fetch('/user_message', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    message: message,
+                    conversation_history: history,
+                    session_id: Date.now().toString(36) + Math.random().toString(36).substr(2)
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) {
+                    handleUserMessageError(data.error);
+                } else {
+                    handleUserMessageSuccess(data);
+                }
+            })
+            .catch(err => {
+                handleUserMessageError(err);
+            });
+        }, 300);
+
+        function handleUserMessageError(error) {
+            setStatusBar('Error: ' + error, 'error');
+            elements.simulateBtn.disabled = false;
+            elements.simulatorMode.disabled = false;
+            if (state.simulatorMode) {
+                state.simulationRunning = false;
+            }
+            elements.userInput.disabled = false;
+            elements.sendBtn.disabled = false;
+        }
+
+        function handleUserMessageSuccess(data) {
+            addMessage('bot', data.content);
+            const history = state.conversationHistory;
+            history.push({role: 'bot', content: data.content, timestamp: new Date().toLocaleTimeString()});
+            state.conversationHistory = history;
+            
+            if (data.conversation_complete) {
+                setStatusBar('Thank you for choosing a tariff! The conversation is complete.', 'complete');
+                elements.simulateBtn.disabled = false;
+                elements.simulatorMode.disabled = false;
+                elements.downloadBtn.style.display = 'inline-block';
+                elements.userInput.disabled = true;
+                elements.sendBtn.disabled = true;
+                state.simulationRunning = false;
+            } else {
+                setStatusBar('You can continue the conversation or end it.', '');
+                elements.userInput.disabled = false;
+                elements.sendBtn.disabled = false;
+                elements.userInput.focus();
+            }
+        }
+
+        function sendUserMessage() {
+            if (state.simulatorMode && !state.simulationRunning) {
+                console.error('Cannot send message: simulation is not running');
+                return;
+            }
+            debouncedSendMessage();
+        }
+
+        function downloadConversation() {
+            const history = state.conversationHistory;
+            if (!history.length) return;
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(history, null, 2));
+            const dlAnchor = document.createElement('a');
+            dlAnchor.setAttribute("href", dataStr);
+            dlAnchor.setAttribute("download", "conversation.json");
+            document.body.appendChild(dlAnchor);
+            dlAnchor.click();
+            dlAnchor.remove();
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set initial mode
+            setMode(state.simulatorMode ? 'simulator' : 'user');
+            
+            // Add event listeners
+            elements.userInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    sendUserMessage();
+                }
+            });
+
+            // Load existing conversation if any
+            const history = state.conversationHistory;
+            if (history.length > 0) {
+                history.forEach(msg => addMessage(msg.role, msg.content));
+            }
+        });
+    </script>
+</body>
+</html> 
