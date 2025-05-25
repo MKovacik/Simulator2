@@ -14,10 +14,16 @@ from crewai import Agent, Task
 import requests
 from langchain.llms.base import LLM
 from personas import PERSONAS
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # === Constants ===
-TARIFFS_FILE = 'Tarifs.md'
-CONVERSATION_HISTORY_DIR = 'conversation_history'
+TARIFFS_FILE = os.getenv('TARIFFS_FILE', 'Tarifs.md')
+CONVERSATION_HISTORY_DIR = os.getenv('CONVERSATION_HISTORY_DIR', 'conversation_history')
+SESSION_MAX_AGE_MINUTES = int(os.getenv('SESSION_MAX_AGE_MINUTES', '30'))
+MAX_TURNS = 10
 
 # === Flask App ===
 app = Flask(__name__)
@@ -39,17 +45,18 @@ class SessionManager:
                 'persona': None,
                 'last_activity': datetime.now()
             }
+        self.update_activity(session_id)
         return self.sessions[session_id]
 
     def update_activity(self, session_id: str):
         if session_id in self.sessions:
             self.sessions[session_id]['last_activity'] = datetime.now()
 
-    def cleanup_old_sessions(self, max_age_minutes: int = 30):
+    def cleanup_old_sessions(self):
         now = datetime.now()
         expired_sessions = [
             sid for sid, session in self.sessions.items()
-            if (now - session['last_activity']).total_seconds() > max_age_minutes * 60
+            if (now - session['last_activity']).total_seconds() > SESSION_MAX_AGE_MINUTES * 60
         ]
         for sid in expired_sessions:
             del self.sessions[sid]
@@ -59,14 +66,15 @@ session_manager = SessionManager()
 # === LLM Wrapper ===
 class LMStudioLLM(LLM):
     """LLM wrapper for LMStudio API."""
-    base_url: str = "http://localhost:1234/v1"
+    base_url: str = os.getenv('LMSTUDIO_BASE_URL', 'http://localhost:1234/v1')
+    model_name: str = os.getenv('LMSTUDIO_MODEL_NAME', 'phi-4')
 
     def _call(self, prompt: str, stop: Optional[List[str]] = None) -> str:
         try:
             response = requests.post(
                 f"{self.base_url}/chat/completions",
                 json={
-                    "model": "phi-4",
+                    "model": self.model_name,
                     "messages": [
                         {"role": "system", "content": "You are a helpful AI assistant. Provide clear and concise responses."},
                         {"role": "user", "content": prompt}
@@ -88,14 +96,14 @@ class LMStudioLLM(LLM):
 
     @property
     def _identifying_params(self) -> Dict[str, Any]:
-        return {"base_url": self.base_url}
+        return {"base_url": self.base_url, "model_name": self.model_name}
 
 # === Helper Functions ===
 def read_tariffs(file_path: str = TARIFFS_FILE) -> str:
     """Read the tariffs Markdown file."""
     if not os.path.exists(file_path):
         return "Tariff data not available."
-    with open(file_path, 'r') as f:
+    with open(file_path, 'r', encoding='utf-8') as f:
         return f.read()
 
 def format_conversation(history: List[Dict[str, str]]) -> str:
@@ -113,8 +121,14 @@ def sse_message(data: dict) -> str:
 def save_conversation(session_id: str, conversation_data: Dict):
     """Save conversation data to a JSON file in the conversation_history directory."""
     filename = os.path.join(CONVERSATION_HISTORY_DIR, f'conversation_{session_id}.json')
-    with open(filename, 'w') as f:
+    with open(filename, 'w', encoding='utf-8') as f:
         json.dump(conversation_data, f, indent=2)
+
+def get_last_exchange(history: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    """Get the last exchange (last customer message and bot response) from conversation history."""
+    if len(history) >= 2:
+        return history[-2:]
+    return history
 
 # === Agents ===
 llm = LMStudioLLM()
@@ -166,7 +180,6 @@ def simulate_conversation() -> Response:
             session_manager.update_activity(session_id)
 
             if not simulator_mode:
-                # User input mode: handled by /user_message
                 return
 
             tarifs_md = read_tariffs()
@@ -175,18 +188,16 @@ def simulate_conversation() -> Response:
             persona_needs = persona["needs"]
             session['persona'] = persona_name
 
-            # Send persona name to frontend
             yield sse_message({'persona_name': persona_name})
 
-            # Bot starts the conversation
             bot_greeting = "Hello, I am a Deutsche Telekom agent. How can I help you with your tariff today?"
             session['conversation_history'].append({"role": "bot", "content": bot_greeting})
             yield sse_message({'role': 'bot', 'content': bot_greeting})
 
-            # Customer's first message (persona-driven, with self-introduction)
             status_msg = f"{persona_name} ({customer_agent.role}) is about to speak (first message)."
             print(f"[SIM] {status_msg}")
             yield sse_message({'status': status_msg})
+
             customer_task = Task(
                 description=f"""You are {persona_name}. {persona_needs}
 Start the conversation by introducing yourself by name and expressing your needs and what you are looking for in a new mobile tariff plan. Do NOT provide advice or recommendations. Keep your response concise and natural.""",
@@ -196,27 +207,30 @@ Start the conversation by introducing yourself by name and expressing your needs
             session['conversation_history'].append({"role": "customer", "content": customer_message})
             yield sse_message({'role': 'customer', 'content': customer_message})
 
-            while True:
-                # Observer agent checks if customer has chosen a tariff
+            for turn in range(MAX_TURNS):
                 status_msg = "Observer agent is evaluating if the customer has chosen a tariff..."
                 print(f"[SIM] {status_msg}")
                 yield sse_message({'status': status_msg})
+
+                last_exchange = get_last_exchange(session['conversation_history'])
                 observer_task = Task(
-                    description=f"""Here is the conversation so far:
-{format_conversation(session['conversation_history'])}
+                    description=f"""Review the last exchange in the conversation:
+{format_conversation(last_exchange)}
 
 Has the customer clearly chosen or confirmed a specific Deutsche Telekom tariff plan? If yes, reply with YES and the exact plan name (as mentioned by the customer). If not, reply with NO.""",
                     agent=observer_agent
                 )
                 observer_response = observer_task.execute().strip()
+
                 if observer_response.upper().startswith("YES"):
                     plan_name = observer_response[3:].strip(': .-')
                     if not plan_name:
                         plan_name = "a tariff plan"
-                    # Bot agent sends the final thank you and confirmation message
+
                     status_msg = f"{bot_agent.role} is sending confirmation for plan: {plan_name}"
                     print(f"[SIM] {status_msg}")
                     yield sse_message({'status': status_msg})
+
                     confirmation_task = Task(
                         description=f"The customer has confirmed their selection of the {plan_name} plan. Thank them, confirm their choice, and welcome them to the Deutsche Telekom family. This should be your final message.",
                         agent=bot_agent
@@ -227,10 +241,10 @@ Has the customer clearly chosen or confirmed a specific Deutsche Telekom tariff 
                     yield sse_message({'end': True})
                     break
 
-                # Bot's response (includes Tarifs.md)
                 status_msg = f"{bot_agent.role} is about to respond."
                 print(f"[SIM] {status_msg}")
                 yield sse_message({'status': status_msg})
+
                 bot_task = Task(
                     description=f"""Here is the conversation so far:
 {format_conversation(session['conversation_history'])}
@@ -245,10 +259,10 @@ As a Telekom Assistant, use only the plans and options above to answer the custo
                 session['conversation_history'].append({"role": "bot", "content": bot_message})
                 yield sse_message({'role': 'bot', 'content': bot_message})
 
-                # Customer's response
                 status_msg = f"{persona_name} ({customer_agent.role}) is about to speak."
                 print(f"[SIM] {status_msg}")
                 yield sse_message({'status': status_msg})
+
                 customer_task = Task(
                     description=f"""Here is the conversation so far:
 {format_conversation(session['conversation_history'])}
@@ -261,13 +275,13 @@ Respond ONLY as a real customer. Do NOT provide advice, recommendations, or info
                 session['conversation_history'].append({"role": "customer", "content": customer_message})
                 yield sse_message({'role': 'customer', 'content': customer_message})
 
-            # Save conversation to JSON
             conversation_data = {
                 "timestamp": datetime.now().isoformat(),
                 "persona": persona_name,
                 "conversation": session['conversation_history']
             }
             save_conversation(session_id, conversation_data)
+
         except Exception as e:
             import traceback
             print(traceback.format_exc())
@@ -289,11 +303,10 @@ def user_message():
 
         user_message = data.get('message', '').strip()
         conversation_history = session['conversation_history']
-        
+
         if not user_message:
             return jsonify({'error': 'No message provided.'}), 400
 
-        # Get bot response
         tarifs_md = read_tariffs()
         bot_task = Task(
             description=f"""The customer said: {user_message}
@@ -306,23 +319,25 @@ As a Telekom Assistant, respond to the customer's needs and questions. Provide i
         )
         bot_message = bot_task.execute()
 
-        # Check if customer has chosen a tariff using observer agent
+        last_exchange = get_last_exchange(conversation_history + [
+            {"role": "customer", "content": user_message},
+            {"role": "bot", "content": bot_message}
+        ])
         observer_task = Task(
-            description=f"""Here is the conversation so far:
-{format_conversation(conversation_history + [{"role": "customer", "content": user_message}, {"role": "bot", "content": bot_message}])}
+            description=f"""Review the last exchange in the conversation:
+{format_conversation(last_exchange)}
 
 Has the customer clearly chosen or confirmed a specific Deutsche Telekom tariff plan? If yes, reply with YES and the exact plan name (as mentioned by the customer). If not, reply with NO.""",
             agent=observer_agent
         )
         observer_response = observer_task.execute().strip()
         conversation_complete = observer_response.upper().startswith("YES")
-        
-        # If a tariff was selected, get the final thank you message
+
         if conversation_complete:
-            selected_plan = observer_response[3:].strip(': .-')  # Extract plan name after "YES"
+            selected_plan = observer_response[3:].strip(': .-')
             if not selected_plan:
-                selected_plan = "the selected tariff"  # Fallback if plan name not found
-            
+                selected_plan = "the selected tariff"
+
             final_message_task = Task(
                 description=f"""The customer has confirmed their selection of the {selected_plan} plan. 
 Send a final thank you message that:
@@ -333,12 +348,10 @@ Send a final thank you message that:
             )
             bot_message = final_message_task.execute()
 
-        # Update conversation history
         conversation_history.append({"role": "customer", "content": user_message})
         conversation_history.append({"role": "bot", "content": bot_message})
         session['conversation_history'] = conversation_history
 
-        # Save conversation to JSON if complete
         if conversation_complete:
             conversation_data = {
                 "timestamp": datetime.now().isoformat(),
@@ -350,10 +363,14 @@ Send a final thank you message that:
             'content': bot_message,
             'conversation_complete': conversation_complete
         })
+
     except Exception as e:
         import traceback
         print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, threaded=True) 
+    port = int(os.getenv('PORT', 5000))
+    host = os.getenv('HOST', '0.0.0.0')
+    debug = os.getenv('FLASK_DEBUG', '1') == '1'
+    app.run(host=host, port=port, debug=debug, threaded=True) 

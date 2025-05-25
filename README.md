@@ -46,19 +46,38 @@ A web application that simulates conversations between customers and a Deutsche 
      - langchain
      - requests
 
-2. **Installation**:
+2. **Local Environment Setup**:
+   - Create a virtual environment:
+     ```bash
+     python -m venv venv
+     ```
+   - Activate the virtual environment:
+     - On Windows:
+       ```bash
+       .\venv\Scripts\activate
+       ```
+     - On macOS/Linux:
+       ```bash
+       source venv/bin/activate
+       ```
+   - Install dependencies:
+     ```bash
+     pip install -r requirements.txt
+     ```
+
+3. **Installation**:
    ```bash
    git clone [repository-url]
    cd [repository-name]
    pip install -r requirements.txt
    ```
 
-3. **Configuration**:
+4. **Configuration**:
    - Ensure LMStudio is running on `http://localhost:1234`
    - Place your tariff data in `Tarifs.md`
    - Configure personas in `personas.py`
 
-4. **Running the Application**:
+5. **Running the Application**:
    ```bash
    python app.py
    ```
