@@ -399,52 +399,6 @@ def simulate_conversation() -> Response:
                     "persona": f"{persona_name}. {persona_needs}",
                     "turn": turn + 1
                 }
-                
-                # Check if customer has chosen a plan
-                status_msg = "Terminator Agent: Evaluating if customer has chosen a tariff plan..."
-                print(f"[SIM] {status_msg}")
-                yield sse_message({'status': status_msg})
-
-                last_exchange = get_last_exchange(session['conversation_history'])
-                terminator_task = Task(
-                    description=TERMINATOR_LAST_EXCHANGE_PROMPT.format(
-                        format_conversation=format_conversation(last_exchange)
-                    ),
-                    agent=terminator_agent,
-                    expected_output="YES with plan name or NO"
-                )
-                terminator_response = terminator_task.execute().strip()
-
-                if terminator_response.upper().startswith("YES"):
-                    plan_name = terminator_response[3:].strip(': .-')
-                    if not plan_name:
-                        plan_name = "a tariff plan"
-
-                    status_msg = f"Telekom Agent: Preparing confirmation for selected plan: {plan_name}"
-                    print(f"[SIM] {status_msg}")
-                    yield sse_message({'status': status_msg})
-
-                    # Create a final confirmation task
-                    confirmation_task = Task(
-                        description=CONFIRMATION_TASK_PROMPT.format(plan_name=plan_name),
-                        agent=telekom_bot,
-                        expected_output="A thank you and confirmation message"
-                    )
-                    
-                    # Create a crew for the final confirmation
-                    final_crew = Crew(
-                        agents=[telekom_bot],
-                        tasks=[confirmation_task],
-                        process=Process.sequential,
-                        verbose=True
-                    )
-                    
-                    # Execute the final crew
-                    confirmation_message = final_crew.kickoff()
-                    session['conversation_history'].append({"role": "bot", "content": confirmation_message})
-                    yield sse_message({'role': 'bot', 'content': confirmation_message})
-                    yield sse_message({'end': True})
-                    break
 
                 # Bot response
                 status_msg = "Telekom Agent: Preparing response..."
@@ -490,12 +444,8 @@ def simulate_conversation() -> Response:
                 )
                 
                 # Observer task to check if customer has chosen a plan
-                terminator_task = Task(
-                    description=TERMINATOR_TASK_PROMPT,
-                    agent=terminator_agent,
-                    expected_output="YES: [plan name] or NO",
-                    depends_on=[customer_task]  
-                )
+                # This task will be executed after the customer responds
+                # We'll update its description with the actual customer message later
                 
                 # Execute tasks directly with timeout handling
                 # Execute bot task with timeout
@@ -521,6 +471,15 @@ def simulate_conversation() -> Response:
                 status_msg = "Terminator Agent: Checking if customer has selected a plan..."
                 print(f"[SIM] {status_msg}")
                 yield sse_message({'status': status_msg})
+                
+                # Create the terminator task with the actual customer message
+                terminator_task = Task(
+                    description=TERMINATOR_USER_TASK_PROMPT.format(
+                        user_message=customer_message
+                    ),
+                    agent=terminator_agent,
+                    expected_output="YES: [plan name] or NO"
+                )
                 
                 # Use our monitoring mechanism for the terminator task without timeout fallback
                 terminator_response = execute_task_with_retry(terminator_task, max_retries=1, timeout=60)

@@ -49,7 +49,7 @@ The simulator uses a multi-agent architecture with three specialized agents:
 
 2. **Customer Agent**: Simulates realistic customer behavior with various personas and needs. This agent progresses the conversation naturally and avoids repetitive responses.
 
-3. **Terminator Agent**: A specialized decision-making agent that determines when a customer has explicitly chosen a tariff plan. This agent uses extremely strict criteria to ensure the conversation only ends when a clear selection has been made. It immediately rejects any message containing a question mark as a plan selection, ensuring customers can ask questions without triggering the end of the conversation.
+3. **Terminator Agent**: A specialized decision-making agent that determines when a customer has explicitly chosen a tariff plan. This agent uses extremely strict criteria to ensure the conversation only ends when a clear selection has been made. It immediately rejects any message containing a question mark as a plan selection, ensuring customers can ask questions without triggering the end of the conversation. The agent analyzes each customer message for both explicit purchase language and the absence of question marks.
 
 ### Conversation Flow
 
@@ -59,7 +59,7 @@ The conversation follows a structured flow:
 
 2. **Progressive Narrowing**: As the conversation continues, the agent narrows down to one best plan that matches all stated requirements.
 
-3. **Decision Point**: The Terminator Agent continuously evaluates if the customer has made a clear selection using strict criteria. It checks for question marks, explicit purchase language, and specific plan naming to ensure only genuine selections are detected.
+3. **Decision Point**: The Terminator Agent evaluates each customer message for plan selection using strict criteria. It first checks for question marks (immediate rejection if found), then looks for explicit purchase language and specific plan naming to ensure only genuine selections are detected.
 
 4. **Confirmation**: When a selection is detected, a personalized confirmation message is generated.
 
@@ -192,6 +192,28 @@ The `.env` file contains:
   - Changes to styling can be made without touching HTML or JavaScript
   - UI behavior can be modified independently of structure
   - Code is more readable with proper separation of concerns
+
+## Recent Improvements
+
+- **Enhanced Terminator Agent**:
+  - Added strict question mark detection to prevent premature conversation termination
+  - Implemented a "FIRST CHECK" mechanism that immediately rejects messages with question marks
+  - Fixed the message analysis to properly evaluate the actual customer message
+  - Ensured proper conversation flow through multiple turns
+
+- **Fixed Conversation Flow**:
+  - Removed redundant terminator checks that were causing premature conversation endings
+  - Ensured proper sequencing of agent interactions (Telekom → Customer → Terminator)
+  - Improved terminator task creation to analyze the actual customer message
+  - Fixed the conversation loop to maintain proper turn-based interactions
+
+## Screenshots
+
+### Simulator Interface
+![Simulator Interface](screenshots/Screen1.png)
+
+### Conversation Example
+![Conversation Example](screenshots/Screen2.png)
 
 ## Features in Detail
 
