@@ -159,13 +159,18 @@ The `.env` file contains:
 ├── .env                  # Environment configuration (LM Studio settings, etc.)
 ├── requirements.txt      # Python dependencies
 ├── conversation_history/ # Stored conversations
+├── static/
+│   ├── css/
+│   │   └── styles.css    # Centralized CSS styles for the application
+│   └── js/
+│       └── script.js     # Centralized JavaScript functionality
 └── templates/
     └── index.html        # Frontend interface with real-time updates
 ```
 
 ### Code Organization
 
-- **Modular Design**: The codebase is organized with a clean separation of concerns:
+- **Modular Backend Design**: The backend codebase is organized with a clean separation of concerns:
   - Agent definitions and orchestration in app.py
   - All prompt templates centralized in prompts.py
   - Customer personas defined in personas.py
@@ -176,6 +181,17 @@ The `.env` file contains:
   - Customer Agent prompts for simulating realistic behavior
   - Terminator Agent prompts for detecting plan selections
   - System prompts for LLM interactions
+
+- **Frontend Organization**: The frontend follows best practices for web development:
+  - HTML structure in templates/index.html
+  - CSS styles extracted to static/css/styles.css
+  - JavaScript functionality in static/js/script.js
+  - Clean separation of structure, presentation, and behavior
+
+- **Improved Maintainability**: Each technology now lives in its own file:
+  - Changes to styling can be made without touching HTML or JavaScript
+  - UI behavior can be modified independently of structure
+  - Code is more readable with proper separation of concerns
 
 ## Features in Detail
 

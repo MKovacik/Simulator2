@@ -1,0 +1,297 @@
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #f0f2f5;
+    margin: 0;
+    padding: 0;
+}
+.container {
+    max-width: 800px;
+    margin: 20px auto;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    padding: 0 0 32px 0;
+    position: relative;
+}
+h1 {
+    color: #1976d2;
+    text-align: center;
+    margin: 0;
+    padding: 16px 0 8px 0;
+    font-size: 1.6rem;
+    letter-spacing: 0.5px;
+}
+.controls {
+    text-align: center;
+    margin: 0 32px 12px 32px;
+    padding: 12px;
+    background: #f7fafc;
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+.mode-selector {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.mode-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 140px;
+    justify-content: center;
+}
+.mode-option:hover {
+    border-color: #1976d2;
+    background: #f5f9ff;
+}
+.mode-option.active {
+    border-color: #1976d2;
+    background: #e3f2fd;
+    box-shadow: 0 2px 8px rgba(25,118,210,0.1);
+}
+.mode-option input[type="radio"] {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    accent-color: #1976d2;
+}
+.mode-option label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #333;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.mode-icon {
+    font-size: 1.4rem;
+}
+.mode-description {
+    text-align: center;
+    color: #666;
+    margin-bottom: 12px;
+    font-size: 0.85rem;
+    line-height: 1.3;
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.action-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+.conversation {
+    margin: 0 32px 16px 32px;
+    padding: 24px;
+    min-height: 350px;
+    max-height: 500px;
+    overflow-y: auto;
+    background: #f7fafc;
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    position: relative;
+}
+.loading-spinner {
+    position: absolute;
+    top: 16px;
+    right: 24px;
+    z-index: 100;
+    display: none;
+    align-items: center;
+    gap: 6px;
+}
+.loading-spinner.active {
+    display: flex;
+}
+.spinner {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #2196f3;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    animation: spin 1s linear infinite;
+}
+.loading-text {
+    font-size: 0.8rem;
+    color: #888;
+}
+.message {
+    display: flex;
+    align-items: flex-end;
+    margin-bottom: 12px;
+    gap: 8px;
+}
+.avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #e3e3e3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    font-weight: bold;
+    color: #fff;
+    flex-shrink: 0;
+}
+.customer .avatar {
+    background: #1976d2;
+}
+.bot .avatar {
+    background: #43a047;
+}
+.bubble {
+    padding: 10px 14px;
+    border-radius: 12px;
+    max-width: 520px;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    position: relative;
+    word-break: break-word;
+}
+.customer .bubble {
+    background: #e3f2fd;
+    color: #1a237e;
+    border-bottom-left-radius: 4px;
+}
+.bot .bubble {
+    background: #e8f5e9;
+    color: #1b5e20;
+    border-bottom-right-radius: 4px;
+}
+.meta {
+    font-size: 0.7rem;
+    color: #888;
+    margin-top: 3px;
+    margin-left: 36px;
+}
+.message.customer {
+    flex-direction: row-reverse;
+}
+.message.customer .meta {
+    text-align: right;
+    margin-left: 0;
+    margin-right: 36px;
+}
+button {
+    background: #1976d2;
+    color: #fff;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 120px;
+    justify-content: center;
+}
+button:hover:not(:disabled) {
+    background: #1565c0;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+button:disabled {
+    background: #b0bec5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+.button-icon {
+    font-size: 1.3rem;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+@media (max-width: 900px) {
+    .container { max-width: 100%; border-radius: 0; }
+    .conversation { padding: 12px 4px 0 4px; }
+    .bubble { max-width: 90vw; }
+    .loading-spinner { right: 10px; top: 10px; }
+    .status-bar { font-size: 0.95rem; }
+}
+.status-bar {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100vw;
+    background: #e3f2fd;
+    color: #1976d2;
+    font-size: 0.85rem;
+    text-align: center;
+    padding: 8px 0;
+    box-shadow: 0 -2px 8px rgba(33,150,243,0.05);
+    z-index: 200;
+    letter-spacing: 0.3px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.status-bar::before {
+    content: '⚙️';
+    margin-right: 8px;
+    font-size: 1rem;
+}
+.status-bar .agent-name {
+    font-weight: bold;
+    color: #0d47a1;
+}
+.status-bar .action {
+    font-style: italic;
+}
+.status-bar.error {
+    background: #ffebee;
+    color: #c62828;
+}
+.status-bar.complete {
+    background: #e8f5e9;
+    color: #388e3c;
+}
+.user-input-container {
+    display: none;
+    margin: 0 32px;
+    background: #f7fafc;
+    padding: 12px;
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+.user-input-wrapper {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    max-width: 800px;
+    margin: 0 auto;
+}
+.user-input-wrapper input {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    border-radius: 6px;
+    border: 1px solid #e0e0e0;
+    transition: all 0.3s ease;
+    background: #fff;
+}
+.user-input-wrapper input:focus {
+    outline: none;
+    border-color: #1976d2;
+    box-shadow: 0 0 0 3px rgba(25,118,210,0.1);
+}
+.user-input-wrapper button {
+    padding: 8px 20px;
+    min-width: 80px;
+}
