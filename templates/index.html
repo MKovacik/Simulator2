@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Telecom Tariff Simulator</title>
+    <title>Deutsche Telekom Tariff Simulator</title>
     <style>
         body {
             font-family: 'Segoe UI', Arial, sans-serif;
@@ -241,10 +241,25 @@
             color: #1976d2;
             font-size: 0.85rem;
             text-align: center;
-            padding: 6px 0;
+            padding: 8px 0;
             box-shadow: 0 -2px 8px rgba(33,150,243,0.05);
             z-index: 200;
             letter-spacing: 0.3px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .status-bar::before {
+            content: '⚙️';
+            margin-right: 8px;
+            font-size: 1rem;
+        }
+        .status-bar .agent-name {
+            font-weight: bold;
+            color: #0d47a1;
+        }
+        .status-bar .action {
+            font-style: italic;
         }
         .status-bar.error {
             background: #ffebee;
@@ -409,7 +424,16 @@
         }
 
         function setStatusBar(message, type = '') {
-            elements.statusBar.textContent = message;
+            // Parse agent name and action from the message format "Agent: Action..."
+            const messageParts = message.match(/^([^:]+):\s*(.+)$/);
+            
+            if (messageParts) {
+                const [_, agentName, action] = messageParts;
+                elements.statusBar.innerHTML = `<span class="agent-name">${agentName}</span>: <span class="action">${action}</span>`;
+            } else {
+                elements.statusBar.textContent = message;
+            }
+            
             elements.statusBar.className = 'status-bar' + (type ? ' ' + type : '');
         }
 

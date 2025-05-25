@@ -1,6 +1,10 @@
-# Telecom Tariff Simulator
+# Deutsche Telekom Tariff Simulator
 
-A web application that simulates conversations between customers and a Deutsche Telekom assistant, helping customers find the most suitable tariff plan based on their needs.
+## Project Background
+
+This project was created as part of a B2B hackathon where I served as a jury member evaluating participants and selecting winners. The simulator was developed to test and demonstrate the capabilities of modern agentic frameworks in a practical business context. As a jury member, I wanted to gain hands-on experience with the technologies being evaluated to better understand their potential applications and limitations.
+
+The simulator demonstrates how AI agents can be used to create realistic, goal-oriented conversations between customers and service representatives, helping customers find the most suitable tariff plan based on their needs while maximizing revenue for Deutsche Telekom.
 
 ## Features
 
@@ -27,13 +31,47 @@ A web application that simulates conversations between customers and a Deutsche 
 - **Backend**:
   - Flask (Python web framework)
   - CrewAI for agent management
-  - LMStudio for LLM integration
+  - LMStudio for LLM integration (optimized for Mistral models)
   - Server-Sent Events (SSE) for real-time updates
 
 - **Frontend**:
   - HTML5/CSS3
   - Vanilla JavaScript
   - Marked.js for Markdown rendering
+
+## Architecture & Decision Making Process
+
+### Multi-Agent Architecture
+
+The simulator uses a multi-agent architecture with three specialized agents:
+
+1. **Telekom Agent**: The primary agent that interacts with customers, understands their needs, and recommends appropriate tariff plans. This agent is designed to balance customer satisfaction with revenue maximization.
+
+2. **Customer Agent**: Simulates realistic customer behavior with various personas and needs. This agent progresses the conversation naturally and avoids repetitive responses.
+
+3. **Terminator Agent**: A specialized decision-making agent that determines when a customer has explicitly chosen a tariff plan. This agent uses extremely strict criteria to ensure the conversation only ends when a clear selection has been made. It immediately rejects any message containing a question mark as a plan selection, ensuring customers can ask questions without triggering the end of the conversation.
+
+### Conversation Flow
+
+The conversation follows a structured flow:
+
+1. **Initial Engagement**: The Telekom Agent presents 2-3 options that match the customer's initial needs.
+
+2. **Progressive Narrowing**: As the conversation continues, the agent narrows down to one best plan that matches all stated requirements.
+
+3. **Decision Point**: The Terminator Agent continuously evaluates if the customer has made a clear selection using strict criteria. It checks for question marks, explicit purchase language, and specific plan naming to ensure only genuine selections are detected.
+
+4. **Confirmation**: When a selection is detected, a personalized confirmation message is generated.
+
+### LLM Integration
+
+The simulator is optimized for use with **LM Studio** and **Mistral models**. When selecting a model, consider these guidelines:
+
+- **Recommended Models**: Mistral-7B-Instruct-v0.3 (currently configured in .env), Mistral-7B-Instruct-v0.2, or other instruction-tuned Mistral variants
+- **Model Requirements**: The model must be capable of following complex instructions and maintaining context across multiple turns
+- **Performance Considerations**: Larger models (7B+) generally perform better for this task
+
+> **Important**: Choose a model that is specifically instruction-tuned. Models without instruction tuning may not properly follow the agent task descriptions and could generate inconsistent responses.
 
 ## Setup Instructions
 
@@ -73,9 +111,22 @@ A web application that simulates conversations between customers and a Deutsche 
    ```
 
 4. **Configuration**:
-   - Ensure LMStudio is running on `http://localhost:1234`
+   - Ensure LMStudio is running on `http://localhost:1234` with an appropriate Mistral model loaded
    - Place your tariff data in `Tarifs.md`
    - Configure personas in `personas.py`
+   - Set up your `.env` file (see below)
+
+### About the .env File
+
+The project includes a `.env` file in the repository that has been intentionally removed from `.gitignore`. This is done to make it easier for others to run the simulator without configuration and to transparently show all settings used in the project.
+
+The `.env` file contains:
+- LMStudio API endpoint configuration (`http://127.0.0.1:1234/v1`)
+- The specific Mistral model being used (`mistral-7b-instruct-v0.3`)
+- File paths for tariffs and conversation history
+- Maximum conversation turns
+
+> **Note**: While including `.env` files in repositories is generally not recommended for production applications with sensitive data, this project contains no sensitive information and is intended for educational/demonstration purposes only.
 
 5. **Running the Application**:
    ```bash
@@ -101,14 +152,30 @@ A web application that simulates conversations between customers and a Deutsche 
 ## Project Structure
 
 ```
-├── app.py                 # Main Flask application
-├── Tarifs.md             # Tariff data
-├── personas.py           # Customer personas
+├── app.py                 # Main Flask application with routing and agent orchestration
+├── prompts.py            # Centralized prompt templates for all agents
+├── personas.py           # Customer personas with diverse needs and preferences
+├── Tarifs.md             # Tariff plan data and descriptions
+├── .env                  # Environment configuration (LM Studio settings, etc.)
 ├── requirements.txt      # Python dependencies
 ├── conversation_history/ # Stored conversations
 └── templates/
-    └── index.html        # Frontend interface
+    └── index.html        # Frontend interface with real-time updates
 ```
+
+### Code Organization
+
+- **Modular Design**: The codebase is organized with a clean separation of concerns:
+  - Agent definitions and orchestration in app.py
+  - All prompt templates centralized in prompts.py
+  - Customer personas defined in personas.py
+  - Tariff data stored in Tarifs.md
+
+- **Prompt Management**: All agent prompts are stored in a dedicated prompts.py file for easier maintenance and updates. This includes:
+  - Telekom Agent prompts for customer assistance
+  - Customer Agent prompts for simulating realistic behavior
+  - Terminator Agent prompts for detecting plan selections
+  - System prompts for LLM interactions
 
 ## Features in Detail
 

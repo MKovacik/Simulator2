@@ -1,18 +1,33 @@
 """
-Telecom Tariff Simulator Backend
+Deutsche Telekom Tariff Simulator Backend
 -------------------------------
-Flask app using CrewAI to simulate a conversation between a telecom customer (random persona) and a Deutsche Telekom bot, with real tariff data from Tarifs.md.
+Flask app using CrewAI to simulate a conversation between a Deutsche Telekom customer (random persona) and a Deutsche Telekom bot, with real tariff data from Tarifs.md.
 """
 
 import os
-import random
 import json
+import time
+import uuid
+import random
+import requests
+import threading
 from datetime import datetime
 from typing import Any, List, Optional, Dict
 from flask import Flask, render_template, jsonify, Response, request, stream_with_context
-from crewai import Agent, Task
-import requests
+from crewai import Agent, Task, Crew, Process
 from langchain.llms.base import LLM
+from prompts import (
+    TELEKOM_TASK_PROMPT,
+    CUSTOMER_TASK_PROMPT,
+    TERMINATOR_TASK_PROMPT,
+    TERMINATOR_USER_TASK_PROMPT,
+    TERMINATOR_LAST_EXCHANGE_PROMPT,
+    CONFIRMATION_TASK_PROMPT,
+    CUSTOMER_INTRO_PROMPT,
+    TELEKOM_SYSTEM_PROMPT,
+    GENERAL_SYSTEM_PROMPT,
+    SIMPLE_SYSTEM_PROMPT
+)
 from personas import PERSONAS
 from dotenv import load_dotenv
 
@@ -32,6 +47,56 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 # Ensure conversation history directory exists
 os.makedirs(CONVERSATION_HISTORY_DIR, exist_ok=True)
+
+# === Helper function to execute tasks with timeout monitoring but no fallbacks
+def execute_task_with_retry(task, max_retries=1, timeout=60):
+    """Execute a task with retry logic and timeout monitoring.
+    
+    This function will wait for the task to complete, regardless of timeout.
+    The timeout parameter is only used for logging purposes.
+    """
+    for attempt in range(max_retries + 1):
+        try:
+            # Use a monitoring mechanism to log long-running tasks
+            result = None
+            start_time = time.time()
+            
+            def execute_task():
+                nonlocal result
+                try:
+                    result = task.execute()
+                except Exception as e:
+                    print(f"Task execution error: {str(e)}")
+                    result = None
+            
+            # Create and start the execution thread
+            execution_thread = threading.Thread(target=execute_task)
+            execution_thread.daemon = True
+            execution_thread.start()
+            
+            # Check periodically if the task is taking too long
+            while execution_thread.is_alive():
+                execution_thread.join(timeout/4)  # Check every quarter of the timeout period
+                
+                if execution_thread.is_alive():
+                    elapsed = time.time() - start_time
+                    if elapsed > timeout:
+                        print(f"Task execution taking longer than expected: {elapsed:.1f} seconds so far")
+                        # We don't return a fallback - just keep waiting
+            
+            if result is not None:
+                elapsed = time.time() - start_time
+                print(f"Task completed in {elapsed:.1f} seconds")
+                return result
+            raise Exception("Task execution failed with no result")
+            
+        except Exception as e:
+            if attempt < max_retries:
+                print(f"Task execution failed, retrying... ({attempt+1}/{max_retries})")
+                time.sleep(1)  # Short delay before retry
+            else:
+                print(f"Task execution failed after {max_retries} retries: {str(e)}")
+                raise  # Re-raise the exception instead of returning a fallback
 
 # === Session Management ===
 class SessionManager:
@@ -66,28 +131,129 @@ session_manager = SessionManager()
 # === LLM Wrapper ===
 class LMStudioLLM(LLM):
     """LLM wrapper for LMStudio API."""
-    base_url: str = os.getenv('LMSTUDIO_BASE_URL', 'http://localhost:1234/v1')
-    model_name: str = os.getenv('LMSTUDIO_MODEL_NAME', 'phi-4')
+    # Define these as class attributes for Pydantic
+    base_url: str = "http://localhost:1234/v1"
+    model_name: str = "mistral-7b-instruct-v0.3"
+    
+    def __init__(self):
+        # Force reload from environment variables every time
+        super().__init__()
+        # Update the values from environment variables
+        self.base_url = os.getenv('LMSTUDIO_BASE_URL', 'http://localhost:1234/v1')
+        self.model_name = os.getenv('LMSTUDIO_MODEL_NAME', 'mistral-7b-instruct-v0.3')
+        print(f"Initialized LMStudioLLM with model: {self.model_name}\nBase URL: {self.base_url}")
 
     def _call(self, prompt: str, stop: Optional[List[str]] = None) -> str:
         try:
-            response = requests.post(
-                f"{self.base_url}/chat/completions",
-                json={
-                    "model": self.model_name,
-                    "messages": [
-                        {"role": "system", "content": "You are a helpful AI assistant. Provide clear and concise responses."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.7,
-                    "max_tokens": -1,
-                    "stream": False
-                }
-            )
-            response.raise_for_status()
-            return response.json()["choices"][0]["message"]["content"]
+            # Check if this is a CrewAI task execution
+            is_crewai_task = "Thought:" in prompt or "Action:" in prompt
+            is_telekom_bot = "Deutsche Telekom Tariff Recommendation Bot" in prompt
+            
+            # Set parameters based on task type - use higher temperature for more natural responses
+            temperature = 0.7  # Standard temperature for natural responses
+            max_tokens = -1    # No token limit to allow full responses
+        
+            
+            # Create appropriate system prompt based on task type - specifically for CrewAI format
+            if is_crewai_task:
+                if is_telekom_bot:
+                    system_prompt = TELEKOM_SYSTEM_PROMPT
+                else:
+                    system_prompt = GENERAL_SYSTEM_PROMPT
+            else:
+                system_prompt = SIMPLE_SYSTEM_PROMPT
+            
+            # Log the start time for performance monitoring
+            start_time = time.time()
+            print(f"Sending request to LMStudio API for model: {self.model_name}")
+            
+            # Prepare request payload - handle models that don't support system role
+            # For Mistral in LM Studio, we need to combine system prompt with user message
+            combined_prompt = prompt
+            if system_prompt:
+                combined_prompt = f"{system_prompt}\n\n{prompt}"
+                
+            payload = {
+                "model": self.model_name,
+                "messages": [
+                    {"role": "user", "content": combined_prompt}
+                ],
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "stream": False
+            }
+            
+            # Ensure the base_url has the correct format
+            api_url = self.base_url
+            if not api_url.endswith('/'):
+                api_url += '/'
+            if not api_url.endswith('v1/'):
+                api_url += 'v1/'
+            
+            # Construct the full endpoint URL
+            endpoint_url = f"{api_url}chat/completions"
+            
+            # Log the request details for debugging
+            print(f"Request URL: {endpoint_url}")
+            print(f"Request payload: {json.dumps(payload, indent=2)}")
+            
+            # Make the API call without a timeout
+            try:
+                response = requests.post(
+                    endpoint_url,
+                    json=payload
+                )
+                
+                # Check if the response is valid JSON
+                try:
+                    response_json = response.json()
+                    print(f"Response status: {response.status_code}")
+                    
+                    if response.status_code != 200:
+                        print(f"Error response: {json.dumps(response_json, indent=2)}")
+                        raise Exception(f"API returned error: {response.status_code} - {response_json.get('error', 'Unknown error')}")
+                    
+                    content = response_json["choices"][0]["message"]["content"]
+                    
+                    # Log completion time
+                    elapsed = time.time() - start_time
+                    print(f"LMStudio API response received in {elapsed:.2f} seconds")
+                    
+                except ValueError as json_err:
+                    print(f"Failed to parse JSON response: {str(json_err)}")
+                    print(f"Raw response: {response.text[:500]}...")
+                    raise Exception(f"Invalid JSON response from API: {str(json_err)}")
+                    
+            except requests.exceptions.RequestException as req_err:
+                print(f"Request failed: {str(req_err)}")
+                raise Exception(f"Request to LMStudio API failed: {str(req_err)}")
+                
+            # Ensure we have valid content
+            if not content:
+                raise Exception("Empty response content from API")
+            
+            # Enhanced format handling for CrewAI responses - simplified for better compatibility
+            if is_crewai_task:
+                # Extract the actual response content, regardless of format
+                actual_content = content
+                
+                # If there's a Final Answer section, extract that as the main content
+                if "Final Answer:" in content:
+                    final_answer_parts = content.split("Final Answer:", 1)
+                    if len(final_answer_parts) > 1:
+                        actual_content = final_answer_parts[1].strip()
+                
+                # Create a properly formatted response for CrewAI
+                # This exact format is what CrewAI expects
+                content = f"Thought: Do I need to use a tool? No\nFinal Answer: {actual_content}"
+                
+                # Log the formatted response
+                print(f"Formatted response for CrewAI:\n{content}")
+            
+            return content
         except requests.exceptions.RequestException as e:
             print(f"Error calling LMStudio API: {str(e)}")
+            # Re-raise the exception instead of providing a fallback
             raise Exception(f"Failed to get response from LMStudio: {str(e)}")
 
     @property
@@ -133,31 +299,38 @@ def get_last_exchange(history: List[Dict[str, str]]) -> List[Dict[str, str]]:
 # === Agents ===
 llm = LMStudioLLM()
 
-customer_agent = Agent(
-    role='Telecom Customer',
-    goal='Express needs and requirements for a new mobile tariff plan',
-    backstory="""You are a real customer looking for a new mobile tariff plan. \
+def create_agents():
+    """Create and return the agents for the conversation."""
+    customer_agent = Agent(
+        role='Deutsche Telekom Customer',
+        goal='Express needs and requirements for a new mobile tariff plan',
+        backstory="""You are a real customer looking for a new mobile tariff plan. \
 You have specific needs regarding data usage, international calls, and budget constraints.\
 You should ask questions and express concerns naturally. Do NOT provide advice, recommendations, or information as if you were an advisor or bot. Only talk about your own needs, preferences, and questions as a customer would.""",
-    llm=llm,
-    verbose=True
-)
+        llm=llm,
+        verbose=True,
+        allow_delegation=False
+    )
 
-bot_agent = Agent(
-    role='Telecom Tariff Recommendation Bot',
-    goal='Help customers find the most suitable tariff plan based on their needs',
-    backstory="""You are an AI assistant specialized in recommending mobile tariff plans for Deutsche Telekom. You have access to a list of available plans and options from the file 'Tarifs.md'. Always offer and recommend only the plans and options listed in that file. You have extensive knowledge of their features and pricing. You should ask relevant questions to understand customer needs and provide personalized recommendations based on the available plans and options from 'Tarifs.md'.""",
-    llm=llm,
-    verbose=True
-)
+    telekom_bot = Agent(
+        role='Deutsche Telekom Agent',
+        goal='Help customers find the right tariff plan while maximizing revenue',
+        backstory="You are a skilled Deutsche Telekom agent who excels at understanding customer needs and recommending appropriate mobile tariff plans. You always listen carefully to customer requests and address their specific questions. While your primary goal is customer satisfaction, you also aim to maximize revenue by suggesting beneficial add-ons and premium features that match customer requirements. Only recommend plans from the Tarifs.md file. Be responsive, helpful, and attentive to customer needs.",
+        llm=llm,
+        verbose=True,
+        allow_delegation=False
+    )
 
-observer_agent = Agent(
-    role='Conversation Observer',
-    goal='Detect if the customer has clearly chosen a tariff plan and, if so, which one.',
-    backstory="""You are an impartial observer of a conversation between a telecom customer and a Deutsche Telekom agent. Your job is to determine if the customer has clearly chosen a specific tariff plan. If so, extract the plan name. If not, state that the customer has not made a clear choice yet.""",
-    llm=llm,
-    verbose=False
-)
+    terminator_agent = Agent(
+        role='Terminator Agent',
+        goal='Determine if the customer has selected a plan',
+        backstory="You analyze customer messages to determine if they have explicitly chosen a tariff plan. You are extremely strict about what counts as a selection. If a selection is made, you identify the exact plan name.",
+        llm=llm,
+        verbose=True,
+        allow_delegation=False
+    )
+    
+    return customer_agent, telekom_bot, terminator_agent
 
 # === Routes ===
 @app.route('/')
@@ -167,7 +340,7 @@ def home():
 
 @app.route('/simulate')
 def simulate_conversation() -> Response:
-    """Simulate a conversation between a telecom customer and the bot, streaming results via SSE."""
+    """Simulate a conversation between a Deutsche Telekom customer and the bot, streaming results via SSE."""
     def generate():
         try:
             session_id = request.args.get('session_id', '')
@@ -193,87 +366,191 @@ def simulate_conversation() -> Response:
             bot_greeting = "Hello, I am a Deutsche Telekom agent. How can I help you with your tariff today?"
             session['conversation_history'].append({"role": "bot", "content": bot_greeting})
             yield sse_message({'role': 'bot', 'content': bot_greeting})
+            
+            # Create agents for this conversation
+            customer_agent, telekom_bot, terminator_agent = create_agents()
 
-            status_msg = f"{persona_name} ({customer_agent.role}) is about to speak (first message)."
+            # First customer message
+            status_msg = f"{persona_name} (Customer) is about to speak (first message)."
             print(f"[SIM] {status_msg}")
             yield sse_message({'status': status_msg})
-
+            
+            # Create the first customer task
             customer_task = Task(
-                description=f"""You are {persona_name}. {persona_needs}
-Start the conversation by introducing yourself by name and expressing your needs and what you are looking for in a new mobile tariff plan. Do NOT provide advice or recommendations. Keep your response concise and natural.""",
-                agent=customer_agent
+                description=CUSTOMER_INTRO_PROMPT.format(
+                    persona_name=persona_name,
+                    persona_needs=persona_needs
+                ),
+                agent=customer_agent,
+                expected_output="A natural customer introduction and expression of needs"
             )
+            
+            # Execute the first customer task directly
             customer_message = customer_task.execute()
             session['conversation_history'].append({"role": "customer", "content": customer_message})
             yield sse_message({'role': 'customer', 'content': customer_message})
 
+            # Main conversation loop
             for turn in range(MAX_TURNS):
-                status_msg = "Observer agent is evaluating if the customer has chosen a tariff..."
+                # Create a shared context for this turn
+                shared_context = {
+                    "conversation_history": format_conversation(session['conversation_history']),
+                    "tariffs": tarifs_md,
+                    "persona": f"{persona_name}. {persona_needs}",
+                    "turn": turn + 1
+                }
+                
+                # Check if customer has chosen a plan
+                status_msg = "Terminator Agent: Evaluating if customer has chosen a tariff plan..."
                 print(f"[SIM] {status_msg}")
                 yield sse_message({'status': status_msg})
 
                 last_exchange = get_last_exchange(session['conversation_history'])
-                observer_task = Task(
-                    description=f"""Review the last exchange in the conversation:
-{format_conversation(last_exchange)}
-
-Has the customer clearly chosen or confirmed a specific Deutsche Telekom tariff plan? If yes, reply with YES and the exact plan name (as mentioned by the customer). If not, reply with NO.""",
-                    agent=observer_agent
+                terminator_task = Task(
+                    description=TERMINATOR_LAST_EXCHANGE_PROMPT.format(
+                        format_conversation=format_conversation(last_exchange)
+                    ),
+                    agent=terminator_agent,
+                    expected_output="YES with plan name or NO"
                 )
-                observer_response = observer_task.execute().strip()
+                terminator_response = terminator_task.execute().strip()
 
-                if observer_response.upper().startswith("YES"):
-                    plan_name = observer_response[3:].strip(': .-')
+                if terminator_response.upper().startswith("YES"):
+                    plan_name = terminator_response[3:].strip(': .-')
                     if not plan_name:
                         plan_name = "a tariff plan"
 
-                    status_msg = f"{bot_agent.role} is sending confirmation for plan: {plan_name}"
+                    status_msg = f"Telekom Agent: Preparing confirmation for selected plan: {plan_name}"
                     print(f"[SIM] {status_msg}")
                     yield sse_message({'status': status_msg})
 
+                    # Create a final confirmation task
                     confirmation_task = Task(
-                        description=f"The customer has confirmed their selection of the {plan_name} plan. Thank them, confirm their choice, and welcome them to the Deutsche Telekom family. This should be your final message.",
-                        agent=bot_agent
+                        description=CONFIRMATION_TASK_PROMPT.format(plan_name=plan_name),
+                        agent=telekom_bot,
+                        expected_output="A thank you and confirmation message"
                     )
-                    confirmation_message = confirmation_task.execute()
+                    
+                    # Create a crew for the final confirmation
+                    final_crew = Crew(
+                        agents=[telekom_bot],
+                        tasks=[confirmation_task],
+                        process=Process.sequential,
+                        verbose=True
+                    )
+                    
+                    # Execute the final crew
+                    confirmation_message = final_crew.kickoff()
                     session['conversation_history'].append({"role": "bot", "content": confirmation_message})
                     yield sse_message({'role': 'bot', 'content': confirmation_message})
                     yield sse_message({'end': True})
                     break
 
-                status_msg = f"{bot_agent.role} is about to respond."
+                # Bot response
+                status_msg = "Telekom Agent: Preparing response..."
                 print(f"[SIM] {status_msg}")
                 yield sse_message({'status': status_msg})
 
+                # Calculate conversation turn number
+                turn_number = len([msg for msg in session['conversation_history'] if msg['role'] == 'customer'])
+                
                 bot_task = Task(
-                    description=f"""Here is the conversation so far:
-{format_conversation(session['conversation_history'])}
-
-Here are the official Deutsche Telekom tariff plans and options:
-{tarifs_md}
-
-As a Telekom Assistant, use only the plans and options above to answer the customer's needs. Ask relevant questions to understand their requirements better. Provide information and recommendations only from the plans and options above. If the customer hasn't made a choice yet, suggest specific plans that match their needs. Keep your response concise and natural.""",
-                    agent=bot_agent
+                    description=TELEKOM_TASK_PROMPT.format(
+                        conversation_history=format_conversation(session['conversation_history']),
+                        tariffs=tarifs_md,
+                        persona=f"{persona_name}. {persona_needs}"
+                    ),
+                    agent=telekom_bot,
+                    expected_output="Responsive, helpful recommendation that addresses the customer's specific questions and needs"
                 )
-                bot_message = bot_task.execute()
+                
+                # Get the previous customer messages to check for repetition
+                prev_customer_msgs = [msg['content'] for msg in session['conversation_history'] if msg['role'] == 'customer']
+                
+                # Execute the bot task with monitoring but no timeout fallback
+                status_msg = "Telekom Agent: Analyzing customer needs and generating response..."
+                print(f"[SIM] {status_msg}")
+                yield sse_message({'status': status_msg})
+                
+                bot_message = execute_task_with_retry(bot_task, max_retries=1, timeout=120)
                 session['conversation_history'].append({"role": "bot", "content": bot_message})
                 yield sse_message({'role': 'bot', 'content': bot_message})
-
-                status_msg = f"{persona_name} ({customer_agent.role}) is about to speak."
+                
+                # Now create the customer task with the bot message
+                customer_task = Task(
+                    description=CUSTOMER_TASK_PROMPT.format(
+                        persona_name=persona_name,
+                        persona_needs=persona_needs,
+                        conversation_history=format_conversation(session['conversation_history']),
+                        bot_message=bot_message,
+                        prev_customer_msgs=prev_customer_msgs[-2:] if len(prev_customer_msgs) >= 2 else []
+                    ),
+                    agent=customer_agent,
+                    expected_output="A single, natural customer response under 100 words that progresses the conversation"
+                )
+                
+                # Observer task to check if customer has chosen a plan
+                terminator_task = Task(
+                    description=TERMINATOR_TASK_PROMPT,
+                    agent=terminator_agent,
+                    expected_output="YES: [plan name] or NO",
+                    depends_on=[customer_task]  
+                )
+                
+                # Execute tasks directly with timeout handling
+                # Execute bot task with timeout
+                status_msg = "Telekom Agent: Generating response (with timeout protection)..."
                 print(f"[SIM] {status_msg}")
                 yield sse_message({'status': status_msg})
-
-                customer_task = Task(
-                    description=f"""Here is the conversation so far:
-{format_conversation(session['conversation_history'])}
-
-You are {persona_name}. {persona_needs}
-Respond ONLY as a real customer. Do NOT provide advice, recommendations, or information as if you were an advisor or bot. Focus on expressing your own needs, preferences, or questions. If you want to choose a plan, clearly state which plan you want to select. Keep your response concise and natural.""",
-                    agent=customer_agent
-                )
-                customer_message = customer_task.execute()
+                
+                # Bot task has already been executed above
+                
+                # Execute customer task with monitoring
+                status_msg = "Customer is responding (this may take a minute)..."
+                print(f"[SIM] {status_msg}")
+                yield sse_message({'status': status_msg})
+                
+                # Execute the customer task with monitoring but no timeout fallback
+                customer_message = execute_task_with_retry(customer_task, max_retries=1, timeout=120)
+                
+                # Add customer message to conversation history
                 session['conversation_history'].append({"role": "customer", "content": customer_message})
                 yield sse_message({'role': 'customer', 'content': customer_message})
+                
+                # Check if customer has chosen a plan
+                status_msg = "Terminator Agent: Checking if customer has selected a plan..."
+                print(f"[SIM] {status_msg}")
+                yield sse_message({'status': status_msg})
+                
+                # Use our monitoring mechanism for the terminator task without timeout fallback
+                terminator_response = execute_task_with_retry(terminator_task, max_retries=1, timeout=60)
+                
+                # Check if the customer has chosen a plan
+                if terminator_response.upper().startswith("YES:"):
+                    plan_name = terminator_response[4:].strip()
+                    if not plan_name:
+                        plan_name = "a tariff plan"
+                        
+                    status_msg = f"Telekom Agent: Preparing confirmation for selected plan: {plan_name}"
+                    print(f"[SIM] {status_msg}")
+                    yield sse_message({'status': status_msg})
+                    
+                    # Create a final confirmation task
+                    confirmation_task = Task(
+                        description=CONFIRMATION_TASK_PROMPT.format(plan_name=plan_name),
+                        agent=telekom_bot,
+                        expected_output="Brief welcome message and next steps under 50 words"
+                    )
+                    
+                    # Execute the confirmation task with monitoring but no timeout fallback
+                    status_msg = "Telekom Agent: Generating welcome message for new customer..."
+                    print(f"[SIM] {status_msg}")
+                    yield sse_message({'status': status_msg})
+                    confirmation_message = execute_task_with_retry(confirmation_task, max_retries=1, timeout=60)
+                    session['conversation_history'].append({"role": "bot", "content": confirmation_message})
+                    yield sse_message({'role': 'bot', 'content': confirmation_message})
+                    yield sse_message({'end': True})
+                    break
 
             conversation_data = {
                 "timestamp": datetime.now().isoformat(),
@@ -307,51 +584,111 @@ def user_message():
         if not user_message:
             return jsonify({'error': 'No message provided.'}), 400
 
+        # Create agents for this conversation
+        customer_agent, telekom_bot, terminator_agent = create_agents()
+        
+        # Read tariffs
         tarifs_md = read_tariffs()
+        
+        # Create shared context
+        shared_context = {
+            "conversation_history": format_conversation(conversation_history),
+            "tariffs": tarifs_md,
+            "user_message": user_message
+        }
+        
+        # Create bot response task with optimized description for faster responses
         bot_task = Task(
-            description=f"""The customer said: {user_message}
-
-Here are the official Deutsche Telekom tariff plans and options:
-{tarifs_md}
-
-As a Telekom Assistant, respond to the customer's needs and questions. Provide information and recommendations only from the plans and options above. Keep your response concise and natural.""",
-            agent=bot_agent
+            description=TELEKOM_TASK_PROMPT.format(
+                conversation_history=format_conversation(conversation_history),
+                tariffs=tarifs_md,
+                persona=f"Customer message: {user_message}"
+            ),
+            agent=telekom_bot,
+            expected_output="Brief, helpful response under 100 words"
         )
-        bot_message = bot_task.execute()
+        
+        # Create customer agent task to simulate a follow-up response
+        customer_task = Task(
+            description=CUSTOMER_TASK_PROMPT.format(
+                persona_name="Customer",
+                persona_needs="",
+                conversation_history=format_conversation(conversation_history),
+                bot_message="",  # Not used in this context
+                prev_customer_msgs=[user_message]
+            ),
+            agent=customer_agent,
+            expected_output="A single, natural customer response under 100 words",
+            # No dependency needed as we don't execute this task
+        )
+        
+        # Create a crew for the bot response
+        bot_crew = Crew(
+            agents=[telekom_bot, customer_agent],
+            tasks=[bot_task, customer_task],
+            process=Process.sequential,
+            verbose=True,
+            shared_context=shared_context
+        )
+        
+        # Execute bot task with monitoring but no timeout fallback
+        status_msg = "Telekom Agent: Analyzing customer needs and generating response..."
+        print(f"[USER_MSG] {status_msg}")
+        
+        # Use our monitoring mechanism for the bot task without timeout fallback
+        bot_message = execute_task_with_retry(bot_task, max_retries=1, timeout=120)
+        
+        # We don't need to execute the customer_task in the user_message flow
+        # It's only there to simulate a follow-up response in the background
 
+        # Check if the customer has chosen a plan
         last_exchange = get_last_exchange(conversation_history + [
             {"role": "customer", "content": user_message},
             {"role": "bot", "content": bot_message}
         ])
-        observer_task = Task(
-            description=f"""Review the last exchange in the conversation:
-{format_conversation(last_exchange)}
-
-Has the customer clearly chosen or confirmed a specific Deutsche Telekom tariff plan? If yes, reply with YES and the exact plan name (as mentioned by the customer). If not, reply with NO.""",
-            agent=observer_agent
+        
+        # Create observer task to check if the customer has chosen a plan in their message
+        terminator_task = Task(
+            description=TERMINATOR_USER_TASK_PROMPT.format(
+                user_message=user_message
+            ),
+            agent=terminator_agent,
+            expected_output="YES: [plan name] or NO"
         )
-        observer_response = observer_task.execute().strip()
-        conversation_complete = observer_response.upper().startswith("YES")
+        
+        # Execute the observer task with monitoring but no timeout fallback
+        status_msg = "Terminator Agent: Analyzing message for plan selection..."
+        print(f"[USER_MSG] {status_msg}")
+        terminator_response = execute_task_with_retry(terminator_task, max_retries=1, timeout=60)
+            
+        conversation_complete = terminator_response.upper().startswith("YES:")
 
+        # If conversation is complete, send a final thank you message
         if conversation_complete:
-            selected_plan = observer_response[3:].strip(': .-')
+            selected_plan = terminator_response[4:].strip()
             if not selected_plan:
                 selected_plan = "the selected tariff"
 
+            # Create a final confirmation task
             final_message_task = Task(
-                description=f"""The customer has confirmed their selection of the {selected_plan} plan. 
-Send a final thank you message that:
-1. Thanks them for choosing the specific plan
-2. Welcomes them to the Deutsche Telekom family
-3. Keeps the message concise and friendly""",
-                agent=bot_agent
+                description=CONFIRMATION_TASK_PROMPT.format(plan_name=selected_plan),
+                agent=telekom_bot,
+                expected_output="Brief thank you and confirmation under 50 words"
             )
-            bot_message = final_message_task.execute()
+            
+            # Execute the final message task with monitoring but no timeout fallback
+            status_msg = "Generating final confirmation message..."
+            print(f"[USER_MSG] {status_msg}")
+            final_message = execute_task_with_retry(final_message_task, max_retries=1, timeout=60)
+            
+            bot_message = final_message
 
+        # Update conversation history
         conversation_history.append({"role": "customer", "content": user_message})
         conversation_history.append({"role": "bot", "content": bot_message})
         session['conversation_history'] = conversation_history
 
+        # Save conversation if complete
         if conversation_complete:
             conversation_data = {
                 "timestamp": datetime.now().isoformat(),
