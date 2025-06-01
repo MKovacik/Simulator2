@@ -5,11 +5,9 @@ It handles the creation and management of agents and tasks, leveraging CrewAI's 
 while ensuring compatibility with LM Studio.
 """
 
-import os
 import time
-import threading
 import concurrent.futures
-from typing import Dict, List, Tuple, Optional
+from typing import List, Optional
 from crewai import Agent, Task, Crew, Process
 from src.core.llm_adapter import get_llm
 from src.data.prompts import (
@@ -143,9 +141,16 @@ class TelekomCrewManager:
         # Check for question marks as an early indicator
         if '?' in user_message:
             print(f"[TERMINATOR] Quick check: Message contains question mark, will likely reject")
-            
+            # Add a stronger emphasis in the prompt about the question mark
+            prompt = TERMINATOR_USER_TASK_PROMPT.format(user_message=user_message)
+            # Add an extra warning about the question mark at the beginning of the prompt
+            prompt = prompt.replace("User: Here's the customer's message:", 
+                                  "User: Here's the customer's message (WHICH CONTAINS A QUESTION MARK - MUST RESPOND WITH NO):")
+        else:
+            prompt = TERMINATOR_USER_TASK_PROMPT.format(user_message=user_message)
+        
         return Task(
-            description=TERMINATOR_USER_TASK_PROMPT.format(user_message=user_message),
+            description=prompt,
             agent=self.terminator_agent,
             expected_output="YES: [plan name] or NO with reason"
         )
@@ -237,6 +242,12 @@ class TelekomCrewManager:
                 
                 # For terminator agent, log the decision with more detail
                 if agent_role == 'Terminator Agent':
+                    # Check if this is a terminator task analyzing a message with a question mark
+                    if '?' in task.description and result.upper().startswith("YES:"):
+                        # Override the result if the message contains a question mark but the LLM still returned YES
+                        print(f"[TERMINATOR] OVERRIDE: Message contains question mark but LLM returned '{result}'. Forcing NO.")
+                        result = "NO: Message contains a question mark"
+                        
                     if result.upper().startswith("YES:"):
                         plan_name = result[4:].strip()
                         print(f"[TERMINATOR] DECISION: Selected plan '{plan_name}'")

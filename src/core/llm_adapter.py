@@ -9,11 +9,11 @@ limitation of only supporting 'user' and 'assistant' roles.
 import os
 import json
 import requests
-from typing import Any, Dict, List, Mapping, Optional
+import time
+from typing import Any, Dict, List, Optional
 from langchain_core.language_models.llms import LLM
 from langchain_core.callbacks.manager import CallbackManagerForLLMRun
 from dotenv import load_dotenv
-import time
 
 # Global list to store LLM logs
 llm_logs = []

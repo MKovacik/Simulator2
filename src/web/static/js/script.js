@@ -47,7 +47,8 @@ const state = {
         sessionStorage.setItem('simulationRunning', value);
     },
     get showLogs() {
-        return sessionStorage.getItem('showLogs') === 'true';
+        // Default to true if not set
+        return sessionStorage.getItem('showLogs') !== 'false';
     },
     set showLogs(value) {
         sessionStorage.setItem('showLogs', value);

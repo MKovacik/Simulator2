@@ -272,7 +272,7 @@ button:disabled {
 .log-message.log-llm {
     border-left: 4px solid #9b59b6;
     color: #9b59b6;
-    font-size: 0.85em;
+    font-size: 0.5em;
 }
 
 /* Log message styles */
@@ -286,7 +286,7 @@ button:disabled {
     background: #f0f0f0;
     color: #555;
     font-family: monospace;
-    font-size: 0.85rem;
+    font-size: 0.55rem;
     padding: 8px 12px;
     border-radius: 8px;
     border-left: 3px solid #1976d2;

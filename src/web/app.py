@@ -7,13 +7,10 @@ Flask app using CrewAI to simulate a conversation between a Deutsche Telekom cus
 import os
 import json
 import time
-import uuid
 import random
-import requests
-import threading
 from datetime import datetime
 from typing import Any, List, Optional, Dict, Generator
-from flask import Flask, render_template, jsonify, Response, request, stream_with_context, session
+from flask import Flask, render_template, jsonify, Response, request, stream_with_context
 from src.agents.crew_manager import TelekomCrewManager
 from src.core.llm_adapter import get_llm, get_llm_logs, clear_llm_logs
 from src.data.prompts import (
@@ -257,7 +254,8 @@ def simulate_conversation() -> Response:
                 yield sse_message({'log': log_msg})
                 
                 # Quick check for question marks as an early indicator
-                if '?' in customer_message:
+                contains_question_mark = '?' in customer_message
+                if contains_question_mark:
                     log_msg = f"[SIM] Quick check: Message contains question mark, will likely not be a plan selection"
                     print(log_msg)
                     yield sse_message({'log': log_msg, 'log_type': 'warning'})
@@ -269,6 +267,14 @@ def simulate_conversation() -> Response:
                 
                 # Use our monitoring mechanism for the terminator task without timeout fallback
                 terminator_response = crew_manager.execute_single_task(terminator_task, max_retries=1, timeout=60)
+                
+                # ENFORCE the rule: If message contains a question mark, override the response to NO
+                # regardless of what the LLM returned
+                if contains_question_mark and terminator_response.startswith("YES"):
+                    override_msg = f"[SIM] OVERRIDE: Message contains question mark, forcing decision to NO despite LLM response"
+                    print(override_msg)
+                    yield sse_message({'log': override_msg, 'log_type': 'error'})
+                    terminator_response = "NO: Message contains a question mark"
                 
                 # Check if the customer has chosen a plan and log the decision
                 log_msg = f"[SIM] Terminator decision: {terminator_response}"
