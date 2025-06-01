@@ -15,7 +15,8 @@ function initializeElements() {
         userInput: document.getElementById('userInput'),
         sendBtn: document.getElementById('sendBtn'),
         statusBar: document.getElementById('statusBar'),
-        modeDescription: document.getElementById('modeDescription')
+        modeDescription: document.getElementById('modeDescription'),
+        logToggleBtn: document.getElementById('logToggleBtn')
     };
 }
 
@@ -44,6 +45,12 @@ const state = {
     },
     set simulationRunning(value) {
         sessionStorage.setItem('simulationRunning', value);
+    },
+    get showLogs() {
+        return sessionStorage.getItem('showLogs') === 'true';
+    },
+    set showLogs(value) {
+        sessionStorage.setItem('showLogs', value);
     }
 };
 
@@ -81,11 +88,49 @@ function setStatusBar(message, type = '') {
     if (messageParts) {
         const [_, agentName, action] = messageParts;
         elements.statusBar.innerHTML = `<span class="agent-name">${agentName}</span>: <span class="action">${action}</span>`;
+        
+        // Also add as a log message to the conversation
+        if (state.showLogs) {
+            addLogMessage(message, type);
+        }
     } else {
         elements.statusBar.textContent = message;
+        
+        // Also add as a log message to the conversation
+        if (state.showLogs) {
+            addLogMessage(message, type);
+        }
     }
     
     elements.statusBar.className = 'status-bar' + (type ? ' ' + type : '');
+}
+
+function addLogMessage(message, type = '') {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message log' + (type ? ' ' + type : '');
+    messageDiv.setAttribute('data-log', 'true');
+    
+    const bubbleDiv = document.createElement('div');
+    bubbleDiv.className = 'bubble';
+    bubbleDiv.textContent = message;
+    
+    messageDiv.appendChild(bubbleDiv);
+    
+    elements.conversation.appendChild(messageDiv);
+    scrollToBottom();
+}
+
+function toggleLogs() {
+    state.showLogs = !state.showLogs;
+    
+    // Update button text
+    elements.logToggleBtn.textContent = state.showLogs ? 'Hide Logs' : 'Show Logs';
+    
+    // Show/hide existing log messages
+    const logMessages = document.querySelectorAll('.message.log');
+    logMessages.forEach(msg => {
+        msg.style.display = state.showLogs ? 'flex' : 'none';
+    });
 }
 
 function setMode(mode) {
@@ -130,6 +175,12 @@ function resetSimulationState() {
     state.conversationHistory = [];
     elements.downloadBtn.style.display = 'none';
     state.customerName = 'Customer';
+    
+    // Initialize log visibility state if not set
+    if (state.showLogs === undefined) {
+        state.showLogs = true;
+        elements.logToggleBtn.textContent = 'Hide Logs';
+    }
 }
 
 function restoreSimulationState() {
@@ -176,6 +227,13 @@ function startSimulation() {
             }
             if (data.end) {
                 handleSimulationEnd();
+                return;
+            }
+            if (data.log) {
+                // Handle log messages
+                if (state.showLogs) {
+                    addLogMessage(data.log, data.log_type || '');
+                }
                 return;
             }
             addMessage(data.role, data.content);
@@ -349,24 +407,28 @@ function downloadConversation() {
 }
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
     // Initialize DOM elements
     initializeElements();
     
     // Set initial mode
+    if (state.simulatorMode === undefined) {
+        state.simulatorMode = true;
+    }
     setMode(state.simulatorMode ? 'simulator' : 'user');
     
-    // Add event listeners
-    elements.userInput.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            sendUserMessage();
-        }
-    });
-
-    // Load existing conversation if any
+    // Set initial log visibility
+    if (state.showLogs === undefined) {
+        state.showLogs = true;
+    }
+    elements.logToggleBtn.textContent = state.showLogs ? 'Hide Logs' : 'Show Logs';
+    
+    // Restore conversation if exists
     const history = state.conversationHistory;
-    if (history.length > 0) {
-        history.forEach(msg => addMessage(msg.role, msg.content));
+    if (history && history.length > 0) {
+        history.forEach(item => {
+            addMessage(item.role, item.content);
+        });
+        elements.downloadBtn.style.display = 'inline-block';
     }
 });

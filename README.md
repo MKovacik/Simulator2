@@ -29,183 +29,151 @@ The simulator demonstrates how AI agents can be used to create realistic, goal-o
 ## Technical Stack
 
 - **Backend**:
-  - Flask (Python web framework)
-  - CrewAI for agent management
-  - LMStudio for LLM integration (optimized for Mistral models)
-  - Server-Sent Events (SSE) for real-time updates
+  - Python 3.x with Flask 3.0.2
+  - CrewAI 0.11.0 for agent orchestration
+  - LM Studio API integration for local LLM inference
+  - Optimized for Mistral 7B Instruct v0.3
 
 - **Frontend**:
-  - HTML5/CSS3
-  - Vanilla JavaScript
-  - Marked.js for Markdown rendering
-
-## Architecture & Decision Making Process
-
-### Multi-Agent Architecture
-
-The simulator uses a multi-agent architecture with three specialized agents:
-
-1. **Telekom Agent**: The primary agent that interacts with customers, understands their needs, and recommends appropriate tariff plans. This agent is designed to balance customer satisfaction with revenue maximization.
-
-2. **Customer Agent**: Simulates realistic customer behavior with various personas and needs. This agent progresses the conversation naturally and avoids repetitive responses.
-
-3. **Terminator Agent**: A specialized decision-making agent that determines when a customer has explicitly chosen a tariff plan. This agent uses extremely strict criteria to ensure the conversation only ends when a clear selection has been made. It immediately rejects any message containing a question mark as a plan selection, ensuring customers can ask questions without triggering the end of the conversation. The agent analyzes each customer message for both explicit purchase language and the absence of question marks.
-
-### Conversation Flow
-
-The conversation follows a structured flow:
-
-1. **Initial Engagement**: The Telekom Agent presents 2-3 options that match the customer's initial needs.
-
-2. **Progressive Narrowing**: As the conversation continues, the agent narrows down to one best plan that matches all stated requirements.
-
-3. **Decision Point**: The Terminator Agent evaluates each customer message for plan selection using strict criteria. It first checks for question marks (immediate rejection if found), then looks for explicit purchase language and specific plan naming to ensure only genuine selections are detected.
-
-4. **Confirmation**: When a selection is detected, a personalized confirmation message is generated.
-
-### LLM Integration
-
-The simulator is optimized for use with **LM Studio** and **Mistral models**. When selecting a model, consider these guidelines:
-
-- **Recommended Models**: Mistral-7B-Instruct-v0.3 (currently configured in .env), Mistral-7B-Instruct-v0.2, or other instruction-tuned Mistral variants
-- **Model Requirements**: The model must be capable of following complex instructions and maintaining context across multiple turns
-- **Performance Considerations**: Larger models (7B+) generally perform better for this task
-
-> **Important**: Choose a model that is specifically instruction-tuned. Models without instruction tuning may not properly follow the agent task descriptions and could generate inconsistent responses.
-
-## Setup Instructions
-
-1. **Prerequisites**:
-   - Python 3.8 or higher
-   - LMStudio running locally on port 1234
-   - Required Python packages (install via `pip install -r requirements.txt`):
-     - flask
-     - crewai
-     - langchain
-     - requests
-
-2. **Local Environment Setup**:
-   - Create a virtual environment:
-     ```bash
-     python -m venv venv
-     ```
-   - Activate the virtual environment:
-     - On Windows:
-       ```bash
-       .\venv\Scripts\activate
-       ```
-     - On macOS/Linux:
-       ```bash
-       source venv/bin/activate
-       ```
-   - Install dependencies:
-     ```bash
-     pip install -r requirements.txt
-     ```
-
-3. **Installation**:
-   ```bash
-   git clone [repository-url]
-   cd [repository-name]
-   pip install -r requirements.txt
-   ```
-
-4. **Configuration**:
-   - Ensure LMStudio is running on `http://localhost:1234` with an appropriate Mistral model loaded
-   - Place your tariff data in `Tarifs.md`
-   - Configure personas in `personas.py`
-   - Set up your `.env` file (see below)
-
-### About the .env File
-
-The project includes a `.env` file in the repository that has been intentionally removed from `.gitignore`. This is done to make it easier for others to run the simulator without configuration and to transparently show all settings used in the project.
-
-The `.env` file contains:
-- LMStudio API endpoint configuration (`http://127.0.0.1:1234/v1`)
-- The specific Mistral model being used (`mistral-7b-instruct-v0.3`)
-- File paths for tariffs and conversation history
-- Maximum conversation turns
-
-> **Note**: While including `.env` files in repositories is generally not recommended for production applications with sensitive data, this project contains no sensitive information and is intended for educational/demonstration purposes only.
-
-5. **Running the Application**:
-   ```bash
-   python app.py
-   ```
-   The application will be available at `http://localhost:5000`
-
-## Usage
-
-### Simulator Mode
-1. Select "Simulator Mode"
-2. Click "Start Simulation"
-3. Watch as the AI personas interact with the Telekom assistant
-4. Download the conversation when complete
-
-### User Input Mode
-1. Select "User Input Mode"
-2. Type your message in the input field
-3. Press Enter or click Send
-4. Continue the conversation until you select a tariff
-5. Download the conversation when complete
-
-## Project Structure
-
-```
-├── app.py                 # Main Flask application with routing and agent orchestration
-├── prompts.py            # Centralized prompt templates for all agents
-├── personas.py           # Customer personas with diverse needs and preferences
-├── Tarifs.md             # Tariff plan data and descriptions
-├── .env                  # Environment configuration (LM Studio settings, etc.)
-├── requirements.txt      # Python dependencies
-├── conversation_history/ # Stored conversations
-├── static/
-│   ├── css/
-│   │   └── styles.css    # Centralized CSS styles for the application
-│   └── js/
-│       └── script.js     # Centralized JavaScript functionality
-└── templates/
-    └── index.html        # Frontend interface with real-time updates
-```
-
-### Code Organization
-
-- **Modular Backend Design**: The backend codebase is organized with a clean separation of concerns:
-  - Agent definitions and orchestration in app.py
-  - All prompt templates centralized in prompts.py
-  - Customer personas defined in personas.py
-  - Tariff data stored in Tarifs.md
-
-- **Prompt Management**: All agent prompts are stored in a dedicated prompts.py file for easier maintenance and updates. This includes:
-  - Telekom Agent prompts for customer assistance
-  - Customer Agent prompts for simulating realistic behavior
-  - Terminator Agent prompts for detecting plan selections
-  - System prompts for LLM interactions
-
-- **Frontend Organization**: The frontend follows best practices for web development:
-  - HTML structure in templates/index.html
-  - CSS styles extracted to static/css/styles.css
-  - JavaScript functionality in static/js/script.js
-  - Clean separation of structure, presentation, and behavior
-
-- **Improved Maintainability**: Each technology now lives in its own file:
-  - Changes to styling can be made without touching HTML or JavaScript
-  - UI behavior can be modified independently of structure
-  - Code is more readable with proper separation of concerns
+  - HTML5, CSS3, JavaScript
+  - Server-Sent Events (SSE) for real-time updates
+  - Responsive design with Flexbox
 
 ## Recent Improvements
 
-- **Enhanced Terminator Agent**:
-  - Added strict question mark detection to prevent premature conversation termination
-  - Implemented a "FIRST CHECK" mechanism that immediately rejects messages with question marks
-  - Fixed the message analysis to properly evaluate the actual customer message
-  - Ensured proper conversation flow through multiple turns
+### 1. Modular Architecture
 
-- **Fixed Conversation Flow**:
-  - Removed redundant terminator checks that were causing premature conversation endings
-  - Ensured proper sequencing of agent interactions (Telekom → Customer → Terminator)
-  - Improved terminator task creation to analyze the actual customer message
-  - Fixed the conversation loop to maintain proper turn-based interactions
+The project has been restructured into a more professional and intuitive architecture:
+
+- **src/core**: Core utilities like the LM Studio adapter
+- **src/agents**: Agent and crew management with CrewAI
+- **src/data**: Data files including tariffs, personas, and prompts
+- **src/web**: Web application components including Flask app, templates, and static files
+
+This modular structure improves maintainability, readability, and makes the project a better example of professional Python application architecture.
+
+### 2. Enhanced CrewAI Integration
+
+- Created a dedicated `TelekomCrewManager` class to encapsulate CrewAI agent and task management
+- Improved task execution with proper error handling, timeouts, and retries
+- Better separation of concerns between agent behavior, LLM interaction, and web application logic
+
+### 3. LM Studio Compatibility
+
+- Custom `LMStudioLLM` adapter to handle LM Studio API specifics
+- Proper handling of role limitations in LM Studio's API
+- Direct LLM calling to avoid compatibility issues with CrewAI's default execution
+
+### 4. Improved Terminator Agent
+
+- Added strict question mark detection to immediately reject messages with questions
+- Enhanced plan selection detection with clear purchase language requirements
+- Fixed conversation flow to prevent premature termination
+- Improved message analysis to properly evaluate actual customer messages
+
+### 5. Progressive Recommendation Strategy
+
+- Early turns (1-2): Present 2-3 options that match initial needs
+- Middle turns (3+): Narrow down to one best plan that matches their needs
+- Later turns (4+): Strongly recommend a single specific plan with persuasive language
+
+## Project Structure
+
+The project follows a professional, modular structure:
+
+```
+├── main.py                # Main entry point for the application
+├── run.sh                 # Script to run the application
+├── run_tests.sh           # Script to run the test suite
+├── test_simulator.py      # Test suite for core components
+├── src/                   # Source code directory
+│   ├── agents/            # Agent-related modules
+│   │   ├── crew_manager.py # CrewAI integration and agent management
+│   │   └── __init__.py    # Package initialization
+│   ├── core/              # Core functionality
+│   │   ├── llm_adapter.py # LM Studio adapter for CrewAI
+│   │   └── __init__.py    # Package initialization
+│   ├── data/              # Data files and models
+│   │   ├── personas.py    # Customer personas
+│   │   ├── prompts.py     # Prompt templates for agents
+│   │   ├── tariffs.md     # Tariff information
+│   │   └── __init__.py    # Package initialization
+│   └── web/               # Web application
+│       ├── app.py         # Flask application
+│       ├── static/        # CSS, JS, and images
+│       ├── templates/     # HTML templates
+│       └── __init__.py    # Package initialization
+├── .env                   # Environment configuration
+├── requirements.txt       # Python dependencies
+└── conversation_history/  # Saved conversations
+```
+
+## Multi-Agent Architecture
+
+The simulator uses three specialized AI agents:
+
+1. **Telekom Agent**:
+   - Helps customers find the best mobile plan
+   - Uses progressive narrowing approach for recommendations
+   - Responds directly to customer questions and needs
+   - Balances customer satisfaction with revenue maximization
+
+2. **Customer Agent** (Simulator Mode Only):
+   - Simulates different customer personas with specific needs
+   - Asks relevant questions about plans
+   - Makes decisions based on how well plans meet their needs
+   - Avoids repetitive messages and progresses the conversation naturally
+
+3. **Terminator Agent**:
+   - Determines if a customer has explicitly selected a plan
+   - Uses strict criteria to detect genuine plan selections
+   - Immediately rejects messages containing question marks
+   - Requires explicit purchase language and specific plan mention
+
+## Running the Application
+
+### Prerequisites
+
+- Python 3.x
+- LM Studio with Mistral 7B Instruct v0.3 (or compatible model)
+- LM Studio API server running on port 1234
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone [repository-url]
+   cd [repository-name]
+   ```
+
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. Configure environment variables in `.env` file:
+   ```
+   LMSTUDIO_BASE_URL="http://127.0.0.1:1234/v1"
+   LMSTUDIO_MODEL_NAME="mistral-7b-instruct-v0.3"
+   PORT=5001
+   ```
+
+4. Run the application:
+   ```bash
+   ./run.sh
+   ```
+
+5. Open your browser and navigate to:
+   ```
+   http://localhost:5001
+   ```
+
+### Testing
+
+Run the test suite to verify all components are working properly:
+```bash
+./run_tests.sh
+```
 
 ## Screenshots
 
@@ -215,19 +183,6 @@ The `.env` file contains:
 ### Conversation Example
 ![Conversation Example](screenshots/Screen2.png)
 
-## Features in Detail
+## License
 
-### Session Management
-- Each browser window maintains its own session
-- Conversations are isolated between windows
-- Automatic session cleanup after 30 minutes of inactivity
-
-### Conversation Storage
-- Conversations are saved in the `conversation_history` directory
-- Each conversation is stored in a separate JSON file
-- Files are named with session IDs for easy tracking
-
-### Real-time Updates
-- Server-Sent Events (SSE) for live conversation updates
-- Status bar shows current operation
-- Loading indicators for long operations
+This project is provided for educational and demonstration purposes.

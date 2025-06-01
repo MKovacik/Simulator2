@@ -251,6 +251,83 @@ button:disabled {
     font-weight: bold;
     color: #0d47a1;
 }
+
+/* Log message types */
+.log-message.log-error {
+    border-left: 4px solid #e74c3c;
+}
+
+.log-message.log-warning {
+    border-left: 4px solid #f39c12;
+}
+
+.log-message.log-success {
+    border-left: 4px solid #2ecc71;
+}
+
+.log-message.log-info {
+    border-left: 4px solid #3498db;
+}
+
+.log-message.log-llm {
+    border-left: 4px solid #9b59b6;
+    color: #9b59b6;
+    font-size: 0.85em;
+}
+
+/* Log message styles */
+.message.log {
+    margin: 8px 0;
+    display: flex;
+    justify-content: center;
+}
+
+.message.log .bubble {
+    background: #f0f0f0;
+    color: #555;
+    font-family: monospace;
+    font-size: 0.85rem;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border-left: 3px solid #1976d2;
+    max-width: 90%;
+}
+
+.message.log.error .bubble {
+    border-left-color: #d32f2f;
+    background: #ffebee;
+}
+
+.message.log.warning .bubble {
+    border-left-color: #ff9800;
+    background: #fff3e0;
+}
+
+.message.log.success .bubble {
+    border-left-color: #4caf50;
+    background: #e8f5e9;
+}
+
+.log-toggle {
+    display: flex;
+    justify-content: center;
+    margin: 0 32px 12px 32px;
+}
+
+.log-toggle button {
+    background: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    color: #555;
+}
+
+.log-toggle button:hover {
+    background: #e0e0e0;
+}
+
 .status-bar .action {
     font-style: italic;
 }

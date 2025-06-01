@@ -19,9 +19,3 @@
 | Hotspot Sharing     | Allows unlimited mobile hotspot usage.        | 5                 |
 
 ---
-
-📢 **Special Offer** (not publicly available, but can be offered to customer):
-
-💶 **10% Discount**
-
-Pay annually and receive a 10% discount on your selected tariff plan and additional options.
