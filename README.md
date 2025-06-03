@@ -196,11 +196,6 @@ flowchart LR
     Turn1 --> Turn3[Turn 3+\nNarrow to ONE\nBEST PLAN]
     Turn3 --> Turn4[Turn 4+\nStrongly Recommend\nSingle Plan]
     Turn4 --> Selection[Customer Makes\nSelection]
-    
-    style Turn1 fill:#ffe0f0,stroke:#e20074
-    style Turn3 fill:#ffd0e8,stroke:#e20074
-    style Turn4 fill:#ffc0e0,stroke:#e20074
-    style Selection fill:#ffb0d8,stroke:#e20074
 ```
 
 ## Running the Application
