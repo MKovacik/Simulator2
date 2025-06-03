@@ -197,10 +197,10 @@ flowchart LR
     Turn3 --> Turn4[Turn 4+\nStrongly Recommend\nSingle Plan]
     Turn4 --> Selection[Customer Makes\nSelection]
     
-    style Turn1 fill:#d0e0ff,stroke:#3080ff
-    style Turn3 fill:#c0d0ff,stroke:#3080ff
-    style Turn4 fill:#b0c0ff,stroke:#3080ff
-    style Selection fill:#90b0ff,stroke:#3080ff
+    style Turn1 fill:#ffe0f0,stroke:#e20074
+    style Turn3 fill:#ffd0e8,stroke:#e20074
+    style Turn4 fill:#ffc0e0,stroke:#e20074
+    style Selection fill:#ffb0d8,stroke:#e20074
 ```
 
 ## Running the Application
