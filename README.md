@@ -254,3 +254,4 @@ Run the test suite to verify all components are working properly:
 ## License
 
 This project is provided for educational and demonstration purposes.
+(Therefore also .env is in source control - I know it's not a good practice.)
