@@ -138,20 +138,20 @@ The following diagram illustrates the conversation flow in the Deutsche Telekom 
 
 ```mermaid
 flowchart TD
-    Start([Start]) --> UserMode{User or Simulator\nMode?}
+    Start([Start]) --> UserMode{"User or Simulator<br/>Mode?"}
     UserMode -->|User Mode| UserInput[User Inputs Message]
-    UserMode -->|Simulator Mode| SimulatedCustomer[Customer Agent\nGenerates Initial Message]
+    UserMode -->|Simulator Mode| SimulatedCustomer["Customer Agent<br/>Generates Initial Message"]
     
     UserInput --> TelekomResponse[Telekom Agent Responds]
     SimulatedCustomer --> TelekomResponse
     
-    TelekomResponse --> CustomerResponse[Customer Responds\n]
+    TelekomResponse --> CustomerResponse[Customer Responds]
     
-    CustomerResponse --> QuestionCheck{Contains\nQuestion Mark?}
-    QuestionCheck -->|Yes| NoSelection[Not a Selection\nContinue Conversation]
-    QuestionCheck -->|No| PurchaseCheck{Contains Explicit\nPurchase Language\n+ Plan Name?}
+    CustomerResponse --> QuestionCheck{"Contains<br/>Question Mark?"}
+    QuestionCheck -->|Yes| NoSelection["Not a Selection<br/>Continue Conversation"]
+    QuestionCheck -->|No| PurchaseCheck{"Contains Explicit<br/>Purchase Language<br/>+ Plan Name?"}
     
-    PurchaseCheck -->|Yes| Selection[Plan Selected!\nGenerate Confirmation]
+    PurchaseCheck -->|Yes| Selection["Plan Selected!<br/>Generate Confirmation"]
     PurchaseCheck -->|No| NoSelection
     
     NoSelection --> TelekomResponse
@@ -165,7 +165,7 @@ This diagram shows how the three agents interact with each other and with the LM
 ```mermaid
 flowchart TD
     subgraph "Deutsche Telekom Simulator"
-        LLM[LM Studio API\nMistral 7B Instruct]
+        LLM["LM Studio API<br/>Mistral 7B Instruct"]
         
         subgraph "CrewAI Framework"
             TA[Telekom Agent]
@@ -177,7 +177,7 @@ flowchart TD
             TER --> TA
         end
         
-        UI[Web Interface\nFlask + SSE]
+        UI["Web Interface<br/>Flask + SSE"]
         
         CrewAI <--> LLM
         UI <--> CrewAI
@@ -192,10 +192,10 @@ The Telekom Agent uses a progressive narrowing approach to recommendations as th
 
 ```mermaid
 flowchart LR
-    Start([Conversation\nBegins]) --> Turn1[Turn 1-2\nPresent 2-3 Options]
-    Turn1 --> Turn3[Turn 3+\nNarrow to ONE\nBEST PLAN]
-    Turn3 --> Turn4[Turn 4+\nStrongly Recommend\nSingle Plan]
-    Turn4 --> Selection[Customer Makes\nSelection]
+    Start(["Conversation<br/>Begins"]) --> Turn1["Turn 1-2<br/>Present 2-3 Options"]
+    Turn1 --> Turn3["Turn 3+<br/>Narrow to ONE<br/>BEST PLAN"]
+    Turn3 --> Turn4["Turn 4+<br/>Strongly Recommend<br/>Single Plan"]
+    Turn4 --> Selection["Customer Makes<br/>Selection"]
 ```
 
 ## Running the Application
