@@ -130,6 +130,79 @@ The simulator uses three specialized AI agents:
    - Immediately rejects messages containing question marks
    - Requires explicit purchase language and specific plan mention
 
+## Workflow Diagrams
+
+### Conversation Flow
+
+The following diagram illustrates the conversation flow in the Deutsche Telekom Tariff Simulator, showing how messages are processed and how plan selections are detected:
+
+```mermaid
+flowchart TD
+    Start([Start]) --> UserMode{User or Simulator\nMode?}
+    UserMode -->|User Mode| UserInput[User Inputs Message]
+    UserMode -->|Simulator Mode| SimulatedCustomer[Customer Agent\nGenerates Initial Message]
+    
+    UserInput --> TelekomResponse[Telekom Agent Responds]
+    SimulatedCustomer --> TelekomResponse
+    
+    TelekomResponse --> CustomerResponse[Customer Responds\n]
+    
+    CustomerResponse --> QuestionCheck{Contains\nQuestion Mark?}
+    QuestionCheck -->|Yes| NoSelection[Not a Selection\nContinue Conversation]
+    QuestionCheck -->|No| PurchaseCheck{Contains Explicit\nPurchase Language\n+ Plan Name?}
+    
+    PurchaseCheck -->|Yes| Selection[Plan Selected!\nGenerate Confirmation]
+    PurchaseCheck -->|No| NoSelection
+    
+    NoSelection --> TelekomResponse
+    Selection --> End([End Conversation])
+```
+
+### Agent Architecture
+
+This diagram shows how the three agents interact with each other and with the LM Studio API within the CrewAI framework:
+
+```mermaid
+flowchart TD
+    subgraph "Deutsche Telekom Simulator"
+        LLM[LM Studio API\nMistral 7B Instruct]
+        
+        subgraph "CrewAI Framework"
+            TA[Telekom Agent]
+            CA[Customer Agent]
+            TER[Terminator Agent]
+            
+            TA <--> CA
+            CA --> TER
+            TER --> TA
+        end
+        
+        UI[Web Interface\nFlask + SSE]
+        
+        CrewAI <--> LLM
+        UI <--> CrewAI
+    end
+    
+    User[User] <--> UI
+```
+
+### Progressive Recommendation Strategy
+
+The Telekom Agent uses a progressive narrowing approach to recommendations as the conversation advances:
+
+```mermaid
+flowchart LR
+    Start([Conversation\nBegins]) --> Turn1[Turn 1-2\nPresent 2-3 Options]
+    Turn1 --> Turn3[Turn 3+\nNarrow to ONE\nBEST PLAN]
+    Turn3 --> Turn4[Turn 4+\nStrongly Recommend\nSingle Plan]
+    Turn4 --> Selection[Customer Makes\nSelection]
+    
+    style Turn1 fill:#d0e0ff,stroke:#3080ff
+    style Turn3 fill:#c0d0ff,stroke:#3080ff
+    style Turn4 fill:#b0c0ff,stroke:#3080ff
+    style Selection fill:#90b0ff,stroke:#3080ff
+```
+
 ## Running the Application
 
 ### Prerequisites
